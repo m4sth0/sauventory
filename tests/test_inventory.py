@@ -17,7 +17,7 @@ https://www.umweltbundesamt.de/sites/default/files/medien/378/publikationen/
 climate-change_24_2014_nationaler_inventarbericht_0.pdf
 '''
 import unittest
-
+import numpy as np
 import inventory
 
 
@@ -57,35 +57,36 @@ class Test(unittest.TestCase):
         # Convert to absolute values in Gg/a.
         self.n2o_uncert = [a*b/100 for a, b in zip(self.n2o_inv,
                                                    self.n2o_percent)]
+        self.n2o_inv_uncert = np.sqrt(np.sum(map(np.square, self.n2o_uncert)))
 
     def tearDown(self):
         pass
 
-    def test_inventar(self):
+    def test_inventar_dict(self):
         i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
                                 "German N2O inventory of agricultural source "
                                 "categories for 2012",
                                 creator="Leppelt")
 
-        i.import_inventory_as_dict(self.n2o_inv, self.n2o_index,
-                                   self.n2o_uncert)
+        i.import_inventory(self.n2o_inv, self.n2o_index,
+                           self.n2o_uncert)
 
-        self.assertEqual(round(sum(i.inv_dict.values(), 1)), 43704.0)
+        self.assertEqual(round(sum(i.inv_dict.values()), 1), 43703.4)
         self.assertEqual(round(sum(i.uncert_dict.values()), 1),
                          round(sum(self.n2o_uncert), 1))
         self.assertEqual(len(i.inv_dict), 18)
 
-    def test_inventar_relative(self):
+    def test_inventar_dict_relative(self):
         i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
                                 "German N2O inventory of agricultural source "
                                 "categories for 2012",
                                 ("2012-01-01 00:00:00", "2013-01-01 00:00:00"),
                                 creator="Leppelt")
 
-        i.import_inventory_as_dict(self.n2o_inv, self.n2o_index,
-                                   self.n2o_percent, True)
+        i.import_inventory(self.n2o_inv, self.n2o_index,
+                           self.n2o_percent, True)
 
-        self.assertEqual(round(sum(i.inv_dict.values(), 1)), 43704.0)
+        self.assertEqual(round(sum(i.inv_dict.values()), 1), 43703.4)
         self.assertEqual(round(sum(i.uncert_dict.values()), 1),
                          round(sum(self.n2o_uncert), 1))
         self.assertEqual(len(i.inv_dict), 18)
@@ -108,6 +109,75 @@ class Test(unittest.TestCase):
         self.assertEqual((start.strftime("%Y-%m-%d %H:%M:%S"),
                           end.strftime("%Y-%m-%d %H:%M:%S")),
                          ("2012-01-01 00:00:00", "2013-01-01 00:00:00"))
+
+    def test_inventar_array(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                creator="Leppelt")
+        n2o_inv_array = np.array(self.n2o_inv).reshape((3, 6))
+        n2o_inv_index = np.array(self.n2o_index).reshape((3, 6))
+        n2o_inv_uncert = np.array(self.n2o_percent).reshape((3, 6))
+
+        i.import_inventory(n2o_inv_array, n2o_inv_index,
+                           n2o_inv_uncert, True)
+
+        self.assertEqual(np.sum(i.inv_array), 43703.4)
+        self.assertEqual(round(np.sum(i.inv_uncert_array), 0),
+                         round(sum(self.n2o_uncert), 0))
+        self.assertEqual(i.inv_array.shape, (3, 6))
+
+    def test_dict_get_inventory(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                creator="Leppelt")
+
+        i.import_inventory(self.n2o_inv, self.n2o_index,
+                           self.n2o_uncert)
+        i.get_inventory()
+        self.assertEqual(round(i.inv_sum, 1), round(np.sum(self.n2o_inv), 1))
+
+    def test_array_get_inventory(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                creator="Leppelt")
+
+        n2o_inv_array = np.array(self.n2o_inv).reshape((3, 6))
+        n2o_inv_index = np.array(self.n2o_index).reshape((3, 6))
+        n2o_inv_uncert = np.array(self.n2o_percent).reshape((3, 6))
+
+        i.import_inventory(n2o_inv_array, n2o_inv_index,
+                           n2o_inv_uncert, True)
+        i.get_inventory()
+        self.assertEqual(round(i.inv_sum, 1), round(np.sum(self.n2o_inv), 1))
+
+    def test_dict_propagate(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                creator="Leppelt")
+
+        i.import_inventory(self.n2o_inv, self.n2o_index,
+                           self.n2o_uncert)
+        i.propagate()
+        self.assertEqual(round(i.inv_uncert, 1), round(self.n2o_inv_uncert, 1))
+
+    def test_array_propagate(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                creator="Leppelt")
+
+        n2o_inv_array = np.array(self.n2o_inv).reshape((3, 6))
+        n2o_inv_index = np.array(self.n2o_index).reshape((3, 6))
+        n2o_inv_uncert = np.array(self.n2o_percent).reshape((3, 6))
+
+        i.import_inventory(n2o_inv_array, n2o_inv_index,
+                           n2o_inv_uncert, True)
+        i.propagate()
+        self.assertEqual(round(i.inv_uncert, 1), round(self.n2o_inv_uncert, 1))
 
 if __name__ == "__main__":
     unittest.main()
