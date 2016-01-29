@@ -1,23 +1,40 @@
-'''
-Created on 04.01.2016
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2016
 
-@author: Thomas Leppelt
-@contact: thomas.leppelt@dwd.de
+# Author(s):
 
-###############################################################################
-                This module is part of the SAUVENTORY package.
-           -- Spatial Autocorrelated Uncertainty of Inventories --
-###############################################################################
+#   Thomas Leppelt <thomas.leppelt@dwd.de>
 
- Within this framework the module is able to perform rank transformation for
- Monte Carlo sampling. Matrices with independent random samples for any type of
- distribution are rearranged to fit to a given correlation matrix.
+# This file is part of sauventory.
+# Spatial Autocorrelated Uncertainty of Inventories
 
- The methodology is adapted from Iman & Conover 1981.
+# sauventory is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
- https://www.uio.no/studier/emner/matnat/math/STK4400/v05/undervisningsmateriale
- /A%20distribution-free%20approach%20to%20rank%20correlation.pdf
-'''
+# sauventory is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# sauventory comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+# This is free software, and you are welcome to redistribute it
+# under certain conditions; type `show c' for details.
+"""
+This module is able to perform rank transformation for
+Monte Carlo sampling. Matrices with independent random samples for any type of
+distribution are rearranged to fit to a given correlation matrix.
+
+The methodology is adapted from Iman & Conover 1981.
+
+https://www.uio.no/studier/emner/matnat/math/STK4400/v05/undervisningsmateriale
+/A%20distribution-free%20approach%20to%20rank%20correlation.pdf
+"""
 
 import numpy as np
 import scipy.stats as sstats

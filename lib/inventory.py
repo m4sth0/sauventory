@@ -1,17 +1,35 @@
-'''
-Created on 07.01.2016
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2016
 
-@author: Thomas Leppelt
-@contact: thomas.leppelt@dwd.de
+# Author(s):
 
-###############################################################################
-                This module is part of the SAUVENTORY package.
-           -- Spatial Autocorrelated Uncertainty of Inventories --
-###############################################################################
+#   Thomas Leppelt <thomas.leppelt@dwd.de>
 
+# This file is part of sauventory.
+# Spatial Autocorrelated Uncertainty of Inventories
+
+# sauventory is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# sauventory is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# sauventory comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+# This is free software, and you are welcome to redistribute it
+# under certain conditions; type `show c' for details.
+"""
 This module defines an inventory class that provide functionalities to compute
 inventories and corresponding uncertainties from given data.
-'''
+"""
+
 
 from datetime import datetime
 import logging
@@ -32,15 +50,15 @@ class Inventory(object):
                  creator=None):
         """ Class instance with following attributes:
         Public:
-            name
-            desc
-            creator
+            name      String represent the name of the inventory.
+            desc      String with inventory description.
+            creator   String containing name of the creator.
         Privat:
-            unit
+            unit       String describing the SI base unit of the inventory.
             timestamp  Tuple with start and end time in %Y-%m-%d %H:%M:%S
                        format. Time instance if end time is empty or None
-            ctime
-            mtime
+            ctime      Time stamp of inventory opject creation.
+            mtime      Last modification time stamp.
             inv_array  Numpy array represent inventory values
             inv_index  Numpy array represent inventory indices
         """
@@ -50,10 +68,12 @@ class Inventory(object):
         self.creator = creator
         self.timestamp = timestamp
         self.__ctime = datetime.now()
-        self.__mtime = self.__ctime
+        self.__mtime = datetime.now()
         self.inv_dict = {}
         self.uncert_dict = {}
         self.inv_uncert = None
+        self.__inv_sum = None
+        self.__inv_uncert = None
         logger.info('Inventory object: initialized')
 
     @property
@@ -71,7 +91,7 @@ class Inventory(object):
 
     @property
     def timestamp(self):
-        return(self.__timestamp)
+        return(map(str, self.__timestamp))
 
     @timestamp.setter
     def timestamp(self, timestamp):
@@ -153,18 +173,47 @@ class Inventory(object):
     def __getmtime(self):
         return self.__mtime.strftime("%Y-%m-%d %H:%M:%S")
 
+    def __setmtime(self, mtime):
+        self.__mtime = mtime
+
+    def __modmtime(self):
+        """Update modification time to present time"""
+        self.mtime = datetime.now()
+
     # Define property methods.
     ctime = property(__getctime)
-    mtime = property(__getmtime)
+    mtime = property(__getmtime, __setmtime)
 
     def printsum(self):
-        info = 'Inventory overview:\n' + 'Name: ' + self.name + \
+        """Print inventory summary information"""
+        start, end = self.timestamp
+        self.accumulate()
+        self.propagate()
+        if self.inv_sum:
+            acc = round(self.inv_sum, 2)
+        else:
+            acc = self.inv_sum
+        if self.inv_uncert:
+            uncert = round(self.inv_uncert, 2)
+        else:
+            uncert = self.inv_uncert
+
+        info = '\n--------------------------------------------------------' + \
+               '\nInventory overview:\n' + 'Name: ' + self.name + \
                '\nDescription: ' + self.desc + \
                '\nCreator: ' + self.creator + \
-                '\nCreation time: ' + self.ctime + \
-                '\nUnit: ' + self.unit + \
-                '\nTimestamp: ' + self.timestamp + \
-                '\nLast modification: ' + self.mtime
+               '\nUnit: ' + self.unit + \
+               '\n--------------------------------------------------------' + \
+               '\nCreation time: ' + self.ctime + \
+               '\nStart: ' + start + \
+               ' - End: ' + end + \
+               '\nModification time: ' + self.mtime + \
+               '\n--------------------------------------------------------' + \
+               '\nInventory summation:   ' + str(acc) + \
+               ' ' + self.unit + \
+               '\nInventory uncertainty: ' + str(uncert) + \
+               ' ' + self.unit + \
+               '\n--------------------------------------------------------'
         logger.info(info)
         print(info)
 
@@ -187,7 +236,7 @@ class Inventory(object):
                        Per default - increasing numbering is used.
                 uncert  list or numpy array representing uncertainty of
                         inventory values stated in defined inventory unit
-                        (absolute values).
+                        (absolute values) as standard deviation (sigma).
                         Relative values are possible -- See <relative> argument
                 relative  Boolean to activate import of percentage values of
                           uncertainty. -> Provoke ntern calculation of absolut
@@ -229,7 +278,9 @@ class Inventory(object):
                         'array' % (self.name, self.inv_array.shape))
         else:
             raise TypeError('Input types are not matching. Need uniform list'
-                             'or array inputs')
+                            'or array inputs')
+
+        self.__modmtime()
 
     def ranktransform(self, mat, cormat):
         """ Function to perform rank transformation of matrices by given
@@ -237,39 +288,52 @@ class Inventory(object):
         """
         mat_trans = ranktransform.transform_by_corrmat(mat, cormat)
 
+        self.__modmtime()
+
         return(mat_trans)
 
-    def get_inventory(self):
+    def accumulate(self):
         """ Calculate inventory from intern source category dictionary or
             array.
         """
-        if not self.inv_dict:
-            result = np.sum(self.inv_array)
-        else:
-            result = np.sum(self.inv_dict.values())
+        try:
+            if not self.inv_dict:
+                result = np.sum(self.inv_array)
+            else:
+                result = np.sum(self.inv_dict.values())
 
-        self.inv_sum = result
+            self.inv_sum = result
 
-        logger.info('Inventory <%s>: %d %s successfully '
-                    'computed' % (self.name, self.inv_sum, self.unit))
+            logger.info('Inventory <%s>: %d %s successfully '
+                        'computed' % (self.name, self.inv_sum, self.unit))
 
-        return(result)
+        except:
+            logger.info('Inventory <%s> not computed'
+                        % (self.name))
+        self.__modmtime()
+
+        return(self.inv_sum)
 
     def propagate(self):
         """ Calculate the overall uncertainty for saved inventory values by
             Gaussian error propagation.
         """
         # Primarily choose existing uncertainty dictionary.
-        if not self.uncert_dict:
-            uncertobj = self.inv_uncert_array
-        else:
-            uncertobj = self.uncert_dict.values()
+        try:
+            if not self.uncert_dict:
+                uncertobj = self.inv_uncert_array
+            else:
+                uncertobj = self.uncert_dict.values()
 
-        result = np.sqrt(np.sum(map(np.square, uncertobj)))
-        self.inv_uncert = result
+            result = np.sqrt(np.sum(map(np.square, uncertobj)))
+            self.inv_uncert = result
 
-        logger.info('Inventory <%s> uncertainty: %d %s successfully '
-                    'computed' % (self.name, self.inv_uncert, self.unit))
+            logger.info('Inventory <%s> uncertainty: %d %s successfully '
+                        'computed' % (self.name, self.inv_uncert, self.unit))
+        except:
+            logger.info('Inventory <%s> uncertainty not computed'
+                        % (self.name))
+        self.__modmtime()
 
 if __name__ == '__main__':
     pass

@@ -1,24 +1,43 @@
-'''
-Created on 14.01.2016
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2016
 
-@author: Thomas Leppelt
-@contact: thomas.leppelt@dwd.de
+# Author(s):
 
-###############################################################################
-                This module is part of the SAUVENTORY package.
-           -- Spatial Autocorrelated Uncertainty of Inventories --
-###############################################################################
+#   Thomas Leppelt <thomas.leppelt@dwd.de>
 
-This module perform unittests for the inentory module.
+# This file is part of sauventory.
+# Spatial Autocorrelated Uncertainty of Inventories
+
+# sauventory is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# sauventory is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# sauventory comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+# This is free software, and you are welcome to redistribute it
+# under certain conditions; type `show c' for details.
+"""
+This module perform unittests for the inventory module.
 
 Testing the module with example the agricultural N2O inventory for 2012:
 
 https://www.umweltbundesamt.de/sites/default/files/medien/378/publikationen/
 climate-change_24_2014_nationaler_inventarbericht_0.pdf
-'''
+"""
+
 import unittest
 import numpy as np
 import inventory
+import time
 
 
 class Test(unittest.TestCase):
@@ -98,17 +117,29 @@ class Test(unittest.TestCase):
                                 ("2012-01-01 00:00:00", None),
                                 creator="Leppelt")
         start, end = i.timestamp
-        self.assertEqual((start.strftime("%Y-%m-%d %H:%M:%S"), end),
-                         ("2012-01-01 00:00:00", None))
+        self.assertEqual((start, end),
+                         ("2012-01-01 00:00:00", 'None'))
         i.timestamp = (None, "2013-01-01 00:00:00")
         start, end = i.timestamp
-        self.assertEqual((start, end.strftime("%Y-%m-%d %H:%M:%S")),
-                         (None, "2013-01-01 00:00:00"))
+        self.assertEqual((start, end),
+                         ('None', "2013-01-01 00:00:00"))
         i.timestamp = ("2012-01-01 00:00:00", "2013-01-01 00:00:00")
         start, end = i.timestamp
-        self.assertEqual((start.strftime("%Y-%m-%d %H:%M:%S"),
-                          end.strftime("%Y-%m-%d %H:%M:%S")),
+        self.assertEqual((start, end),
                          ("2012-01-01 00:00:00", "2013-01-01 00:00:00"))
+
+    def test_mtime(self):
+        i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
+                                "German N2O inventory of agricultural source "
+                                "categories for 2012",
+                                ("2012-01-01 00:00:00", None),
+                                creator="Leppelt")
+        i.ctime
+        time.sleep(1)
+        i.import_inventory(self.n2o_inv, self.n2o_index,
+                           self.n2o_percent, True)
+        self.assertNotEqual(i.ctime, i.mtime)
+        i.printsum()
 
     def test_inventar_array(self):
         i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
@@ -127,7 +158,7 @@ class Test(unittest.TestCase):
                          round(sum(self.n2o_uncert), 0))
         self.assertEqual(i.inv_array.shape, (3, 6))
 
-    def test_dict_get_inventory(self):
+    def test_dict_accumulate(self):
         i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
                                 "German N2O inventory of agricultural source "
                                 "categories for 2012",
@@ -135,10 +166,10 @@ class Test(unittest.TestCase):
 
         i.import_inventory(self.n2o_inv, self.n2o_index,
                            self.n2o_uncert)
-        i.get_inventory()
+        i.accumulate()
         self.assertEqual(round(i.inv_sum, 1), round(np.sum(self.n2o_inv), 1))
 
-    def test_array_get_inventory(self):
+    def test_array_accumulate(self):
         i = inventory.Inventory("N2O-Agrar-2012", "Gg/a",
                                 "German N2O inventory of agricultural source "
                                 "categories for 2012",
@@ -150,7 +181,7 @@ class Test(unittest.TestCase):
 
         i.import_inventory(n2o_inv_array, n2o_inv_index,
                            n2o_inv_uncert, True)
-        i.get_inventory()
+        i.accumulate()
         self.assertEqual(round(i.inv_sum, 1), round(np.sum(self.n2o_inv), 1))
 
     def test_dict_propagate(self):
