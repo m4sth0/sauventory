@@ -10,5 +10,6 @@ setup(name='sauventory',
       packages=['sauventory'],
       install_requires=[
           'numpy',
+          'gdal',
       ],
       zip_safe=False)

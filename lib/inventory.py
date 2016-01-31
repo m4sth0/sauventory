@@ -231,7 +231,7 @@ class Inventory(object):
             Keyword arguments:
                 values  list or numpy array representing inventory values,
                         that are stated in defined inventory unit.
-                index  list or numpy array containg corresponding indices
+                index  list or numpy array containing corresponding indices
                        in string format.
                        Per default - increasing numbering is used.
                 uncert  list or numpy array representing uncertainty of
@@ -239,11 +239,8 @@ class Inventory(object):
                         (absolute values) as standard deviation (sigma).
                         Relative values are possible -- See <relative> argument
                 relative  Boolean to activate import of percentage values of
-                          uncertainty. -> Provoke ntern calculation of absolut
-                          uncertainty values.
-            Returns:
-                dictionarys or numpy arrays containing inventory values or
-                uncertainties with corresponding indices as keys.
+                          uncertainty. -> Provoke intern calculation of
+                          absolute uncertainty values.
         """
         inlist = [values, index, uncert]
 
