@@ -31,18 +31,26 @@ sauventory package.
 """
 
 import numpy as np
+import os
 import unittest
 
+import spatialinventory
 import stepfunction as sf
 
 
 class Test(unittest.TestCase):
 
     def setUp(self):
+        # Set basic array
         self.x = np.arange(20)
         self.y = np.arange(20)
-
+        # Sample from normal distribution.
         self.a = np.random.normal(1, 0.3, 10000)
+
+        # Setup test raster file names and location.
+        cwd = os.getcwd()
+        self.invin = cwd + "/data/model_peat_examp_1.tiff"
+        self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
 
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
@@ -55,6 +63,16 @@ class Test(unittest.TestCase):
         ecdf = sf.ECDF(self.a)
         self.assertAlmostEqual(ecdf(1), 0.5, 1)
 
+    def test_moran(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        si.check_moran()
 
 if __name__ == "__main__":
     unittest.main()

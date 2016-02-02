@@ -35,6 +35,7 @@ and corresponding spatial autocorrelated uncertainties.
 
 import numpy as np
 import logging
+import pysal
 import sys
 from osgeo import gdal
 
@@ -56,7 +57,32 @@ class SpatialInventory(Inventory):
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     def check_moran(self):
-        """ Get Moran's I statistic for georeferenced inventory"""
+        """ Get Moran's I statistic for georeferenced inventory
+
+        This method is utilizing pysal package functions for Moran's I
+        statistics. The weight matrix is constructed as queen's case by
+        default. Each cell (c) as only direct neighbours (n) in each
+        direction per default.
+        –––––––––––
+        |x x x x x|
+        |x n n n x|
+        |x n c n x|
+        |x n n n x|
+        |x x x x x|
+        –––––––––––
+        """
+        # Get grid dimension.
+        dim = self.inv_array.shape
+        # Construct weight matrix in input grid size.
+        w = pysal.lat2W(*dim, rook=False)
+
+        # TODO: Use wsp - sparse weight matrix for large grids.
+        # Calculate Morans's statistic.
+        mi = pysal.Moran(self.inv_array.reshape(w.n, 1), w, two_tailed=False)
+        logger.info("Moran's I of %s successfully calculated for inventory "
+                    "raster %s" % ("%.3f" % mi.I, self.name))
+
+        return(mi)
 
     def get_variogram(self):
         """Get variogram function for spatial inventory values"""

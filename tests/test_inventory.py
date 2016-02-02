@@ -222,10 +222,8 @@ class Test(unittest.TestCase):
                                               ("2012-01-01 00:00:00",
                                                "2013-01-01 00:00:00"),
                                               creator="Tester")
-        cwd = os.getcwd()
-        invin = cwd + "/data/model_peat_examp_1.tiff"
-        uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
-        si.import_inventory_as_raster(invin, uncertin)
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
         self.assertEqual(si.inv_array.shape, (44, 55))
         self.assertEqual(si.inv_uncert_array.shape, (44, 55))
         self.assertEqual(round(np.nanmin(si.inv_array), 3), 0.071)
