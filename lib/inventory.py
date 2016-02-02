@@ -82,7 +82,7 @@ class Inventory(object):
 
     @unit.setter
     def unit(self, unit):
-        unitlist = ["g/m2", "kg/ha", "Gg/a"]
+        unitlist = ["g/m2", "kg/ha", "Gg"]
         if unit in unitlist:
             self.__unit = unit
         else:
@@ -200,8 +200,8 @@ class Inventory(object):
 
         info = '\n--------------------------------------------------------' + \
                '\nInventory overview:\n' + 'Name: ' + self.name + \
-               '\nDescription: ' + self.desc + \
-               '\nCreator: ' + self.creator + \
+               '\nDescription: ' + str(self.desc) + \
+               '\nCreator: ' + str(self.creator) + \
                '\nUnit: ' + self.unit + \
                '\n--------------------------------------------------------' + \
                '\nCreation time: ' + self.ctime + \
@@ -209,15 +209,15 @@ class Inventory(object):
                ' - End: ' + end + \
                '\nModification time: ' + self.mtime + \
                '\n--------------------------------------------------------' + \
-               '\nInventory summation:   ' + str(acc) + \
+               '\nInventory accumulation: ' + str(acc) + \
                ' ' + self.unit + \
-               '\nInventory uncertainty: ' + str(uncert) + \
+               '\nInventory uncertainty:  ' + str(uncert) + \
                ' ' + self.unit + \
                '\n--------------------------------------------------------'
         logger.info(info)
         print(info)
 
-    def import_inventory(self, values, index=None, uncert=None,
+    def import_inventory(self, values, uncert=None, index=None,
                          relative=False):
         """ Import list or array that represents inventory values of
             different source categories and create input type dependent
@@ -230,14 +230,14 @@ class Inventory(object):
 
             Keyword arguments:
                 values  list or numpy array representing inventory values,
-                        that are stated in defined inventory unit.
-                index  list or numpy array containing corresponding indices
-                       in string format.
+                        that are stated in defined inventory unit..
                        Per default - increasing numbering is used.
                 uncert  list or numpy array representing uncertainty of
                         inventory values stated in defined inventory unit
                         (absolute values) as standard deviation (sigma).
                         Relative values are possible -- See <relative> argument
+                index  list or numpy array containing corresponding indices
+                       in string format
                 relative  Boolean to activate import of percentage values of
                           uncertainty. -> Provoke intern calculation of
                           absolute uncertainty values.
@@ -291,13 +291,15 @@ class Inventory(object):
 
     def accumulate(self):
         """ Calculate inventory from intern source category dictionary or
-            array.
+            array values.
+
+            NaN values are ignored and reatead as zero.
         """
         try:
             if not self.inv_dict:
-                result = np.sum(self.inv_array)
+                result = np.nansum(self.inv_array)
             else:
-                result = np.sum(self.inv_dict.values())
+                result = np.nansum(self.inv_dict.values())
 
             self.inv_sum = result
 
@@ -307,6 +309,7 @@ class Inventory(object):
         except:
             logger.info('Inventory <%s> not computed'
                         % (self.name))
+
         self.__modmtime()
 
         return(self.inv_sum)
@@ -314,6 +317,8 @@ class Inventory(object):
     def propagate(self):
         """ Calculate the overall uncertainty for saved inventory values by
             Gaussian error propagation.
+
+            NaN values are ignored and reatead as zero.
         """
         # Primarily choose existing uncertainty dictionary.
         try:
@@ -322,7 +327,7 @@ class Inventory(object):
             else:
                 uncertobj = self.uncert_dict.values()
 
-            result = np.sqrt(np.sum(map(np.square, uncertobj)))
+            result = np.sqrt(np.nansum(map(np.square, uncertobj)))
             self.inv_uncert = result
 
             logger.info('Inventory <%s> uncertainty: %d %s successfully '
@@ -330,7 +335,7 @@ class Inventory(object):
         except:
             logger.info('Inventory <%s> uncertainty not computed'
                         % (self.name))
+
         self.__modmtime()
 
-if __name__ == '__main__':
-    pass
+        return(self.inv_uncert)

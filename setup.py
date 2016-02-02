@@ -11,5 +11,7 @@ setup(name='sauventory',
       install_requires=[
           'numpy',
           'gdal',
+          'pysal',
+          'pykrige',
       ],
       zip_safe=False)
