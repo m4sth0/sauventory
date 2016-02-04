@@ -47,6 +47,13 @@ class Test(unittest.TestCase):
         # Sample from normal distribution.
         self.a = np.random.normal(1, 0.3, 10000)
 
+        # Create artificial raster arrays.
+        self.maxrast = np.concatenate((np.ones((1, 50)), np.zeros((1, 50))
+                                       )).reshape(10, 10)
+        self.nanrast = np.hstack((np.ones((1, 50)),
+                                  np.zeros((1, 50)),
+                                  np.empty((1, 10)) * np.nan)).reshape(11, 10)
+
         # Setup test raster file names and location.
         cwd = os.getcwd()
         self.invin = cwd + "/data/model_peat_examp_1.tiff"
@@ -70,9 +77,32 @@ class Test(unittest.TestCase):
                                               ("2012-01-01 00:00:00",
                                                "2013-01-01 00:00:00"),
                                               creator="Tester")
+        si.import_inventory(self.maxrast)
+        mi = si.check_moran()
+        self.assertEqual(mi, 0.848)
+
+    def test_moran_nan(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+        si.import_inventory(self.nanrast)
+        mi = si.check_moran()
+        self.assertEqual(mi, 0.848)
+
+    def test_moran_nan2(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
 
         si.import_inventory_as_raster(self.invin, self.uncertin)
-        si.check_moran()
+        mi = si.check_moran()
+        self.assertEqual(round(mi, 3), 0.603)
 
 if __name__ == "__main__":
     unittest.main()

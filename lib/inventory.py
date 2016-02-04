@@ -44,7 +44,7 @@ logger = logging.getLogger('inventory')
 class Inventory(object):
 
     # Define class constants.
-    NODATAVAL = np.NaN
+    NODATAVAL = -9999
 
     def __init__(self, name, unit, desc=None, timestamp=(None, None),
                  creator=None):

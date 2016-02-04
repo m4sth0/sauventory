@@ -51,38 +51,106 @@ class SpatialInventory(Inventory):
     def __init__(self, *args, **kwargs):
         """
         Class instance constructor with additional arguments:
-
+        mi    Morans'I value
         For other parameters see: inventory.Inventory
         """
+        self.mi = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
-    def check_moran(self):
+    @property
+    def mi(self):
+        return self.__mi
+
+    @mi.setter
+    def mi(self, mi):
+        self.__mi = mi
+
+    def check_moran(self, rook=False):
         """ Get Moran's I statistic for georeferenced inventory
 
         This method is utilizing pysal package functions for Moran's I
         statistics. The weight matrix is constructed as queen's case by
         default. Each cell (c) as only direct neighbours (n) in each
         direction per default.
-        –––––––––––
-        |x x x x x|
-        |x n n n x|
-        |x n c n x|
-        |x n n n x|
-        |x x x x x|
-        –––––––––––
+        Rook:   –––––––––––    Queen:    –––––––––––
+                |- - - - -|              |- - - - -|
+                |- - n - -|              |- n n n -|
+                |- n c n -|              |- n c n -|
+                |- - n - -|              |- n n n -|
+                |- - - - -|              |- - - - -|
+                –––––––––––              –––––––––––
+        Keyword arguments:
+            rook    Boolean to select spatial weights matrix as rook or
+                    queen case.
         """
+        # Mask nan values of input array.
+        array = self.inv_array
+
         # Get grid dimension.
-        dim = self.inv_array.shape
-        # Construct weight matrix in input grid size.
-        w = pysal.lat2W(*dim, rook=False)
+        dim = array.shape
+        nanids = []
 
-        # TODO: Use wsp - sparse weight matrix for large grids.
-        # Calculate Morans's statistic.
-        mi = pysal.Moran(self.inv_array.reshape(w.n, 1), w, two_tailed=False)
-        logger.info("Moran's I of %s successfully calculated for inventory "
-                    "raster %s" % ("%.3f" % mi.I, self.name))
+        try:
+            # Construct weight matrix in input grid size.
+            w = pysal.lat2W(*dim, rook=rook)
 
-        return(mi)
+            # Reshape input array to N,1 dimension.
+            array = array.reshape((w.n, 1))
+            # Remove weights and neighbors for nan value ids.
+            if np.any(np.isnan(array)):
+                idlist = w.id_order
+                # Get indices for nan values in array.
+                nanids = [i for i in idlist if np.isnan(array[i])]
+                # Remove entries from spatial weight keys for nan indices.
+                for i in nanids:
+                    del w.weights[i]
+                    del w.neighbors[i]
+                    del w.cardinalities[i]
+                # Remove entries from spatial weight values for nan indices.
+                for lid in idlist:
+                    if lid not in nanids:
+                        wlist = w.weights[lid]
+                        nlist = w.neighbors[lid]
+                        idnonan = [nlist.index(ele) for ele in nlist
+                                   if ele not in nanids]
+                        wnew = [wlist[i] for i in idnonan]
+                        nnew = [nlist[i] for i in idnonan]
+                        w.weights[lid] = wnew
+                        w.neighbors[lid] = nnew
+                # Adjust spatial weight parameters.
+                w._id_order = [ele for ele in idlist if ele not in nanids]
+                w._n = len(w.weights)
+                # Remove nan valeus from array..
+                array = np.delete(array, nanids, axis=0)
+
+                logger.info("Found %d NAN values in input array -> "
+                            "All will be removed prior to Moran's I statistic"
+                            % (len(nanids)))
+            # TODO: Use wsp - sparse weight matrix for large grids.
+            # Calculate Morans's statistic.
+            mi = pysal.Moran(array, w, two_tailed=False)
+
+            logger.info("Moran's I successfully calculated")
+            # Print out info box with statistcs.
+            info = "\n" + \
+                   "---------------------------------------------------\n" +\
+                   "| ####     Global Moran's I statistics         ####\n" +\
+                   "| Inventory name   : " + self.name + "\n" +\
+                   "| -------------------------------------------------\n" +\
+                   "| Moran's I              : " + "%.6f" % mi.I + "\n" +\
+                   "| Expected value         : " + "%.6f" % mi.EI + "\n" +\
+                   "| p-value                : " + "%.6f" % mi.p_norm + "\n" +\
+                   "| -------------------------------------------------\n" +\
+                   "| Number of non-NA cells : " + str(len(array)) + "\n" +\
+                   "| Number of NA cells     : " + str(len(nanids)) + "\n" +\
+                   "---------------------------------------------------\n"
+            print(info)
+            self.mi = mi.I
+        except:
+            msg = "Couldn't calculate Moran's I for inventory %s" % (self.name)
+            raise RuntimeError(msg)
+
+        return(self.mi)
 
     def get_variogram(self):
         """Get variogram function for spatial inventory values"""
