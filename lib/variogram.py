@@ -30,7 +30,7 @@ This module defines a semivariogram class with methods to create empirical
 variograms and derive theoretical variogram functions.
 
 The three standard types of variogram functions: spherical, exponential, and
-the Gaussian are supported.share supported
+the Gaussian are supported.
 """
 
 import numpy as np

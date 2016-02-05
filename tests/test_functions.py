@@ -59,6 +59,10 @@ class Test(unittest.TestCase):
         self.invin = cwd + "/data/model_peat_examp_1.tiff"
         self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
 
+        # Setup test vector file names and location.
+        self.invvector = cwd + "/data/n2o_eu_2010_inventory/"
+        "n2o_eu_2010_inventory.shp"
+
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
         f2 = sf.StepFunction(self.x, self.y, side='right')

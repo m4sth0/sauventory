@@ -81,9 +81,16 @@ class Test(unittest.TestCase):
                                                    self.n2o_percent)]
         self.n2o_inv_uncert = np.sqrt(np.sum(map(np.square, self.n2o_uncert)))
 
+        # Setup test raster file names and location.
         cwd = os.getcwd()
         self.invin = cwd + "/data/model_peat_examp_1.tiff"
         self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
+
+        # Setup test vector file names and location.
+        self.invvector = cwd + "/data/n2o_eu_2010_inventory/"
+        "n2o_eu_2010_inventory.shp"
+        # Data source: http://ec.europa.eu/eurostat/statistics-explained/
+        # index.php/Agri-environmental_indicator_-_greenhouse_gas_emissions
 
     def tearDown(self):
         pass
@@ -264,6 +271,21 @@ class Test(unittest.TestCase):
         si.import_inventory_as_raster(self.invin, self.uncertin)
 
         self.assertNotEqual(si.ctime, si.mtime)
+
+    def test_inventory_vector_import(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      index='NUTS_ID')
+        self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
+        self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
+        # self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 0.269)
+        # self.assertEqual(round(np.nanmax(si.inv_uncert_array), 3), 1.387)
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,7 +37,8 @@ import numpy as np
 import logging
 import pysal
 import sys
-from osgeo import gdal
+import ogr
+import gdal
 
 from inventory import Inventory
 
@@ -69,9 +70,11 @@ class SpatialInventory(Inventory):
         """ Get Moran's I statistic for georeferenced inventory
 
         This method is utilizing pysal package functions for Moran's I
-        statistics. The weight matrix is constructed as queen's case by
-        default. Each cell (c) as only direct neighbours (n) in each
-        direction per default.
+        statistics.
+        In case of regular grid input arrays the weight matrix is
+        constructed as queen's case by default.
+        Each cell (c) as only direct neighbours (n) in each direction per
+        default. Alternatively the rook type of neighbors can be choisen.
         Rook:   –––––––––––    Queen:    –––––––––––
                 |- - - - -|              |- - - - -|
                 |- - n - -|              |- n n n -|
@@ -79,6 +82,8 @@ class SpatialInventory(Inventory):
                 |- - n - -|              |- n n n -|
                 |- - - - -|              |- - - - -|
                 –––––––––––              –––––––––––
+        In case of vectorized input data ...
+
         Keyword arguments:
             rook    Boolean to select spatial weights matrix as rook or
                     queen case.
@@ -170,7 +175,7 @@ class RasterInventory(SpatialInventory):
         """
         super(RasterInventory, self).__init__(*args, **kwargs)
 
-    def import_raster(self, infile, band=1):
+    def _import_raster(self, infile, band=1):
         """ Import routine for rasterized geographical referenced data
 
         The import is handled by gdal package of osgeo.
@@ -182,20 +187,15 @@ class RasterInventory(SpatialInventory):
         try:
             rfile = gdal.Open(infile)
         except ImportError:
-            msg = 'Unable to open %s' % (infile)
+            msg = 'Unable to open raster file %s' % (infile)
             raise ImportError(msg)
         # Get selected raster band.
         try:
             rband = rfile.GetRasterBand(band)
-        except ImportError, e:
+        except ImportError:
             msg = 'No band %i found' % (band)
             raise ImportError(msg)
 
-        except RuntimeError, e:
-            # for example, try GetRasterBand(10)
-            print 'Band ( %i ) not found' % band
-            print e
-            sys.exit(1)
         cols = rfile.RasterXSize
         rows = rfile.RasterYSize
         bands = rfile.RasterCount
@@ -242,17 +242,117 @@ class RasterInventory(SpatialInventory):
                 uncertband  Raster band number containing uncertainty data.
                             Default is 1.
         """
-        self.inv_array = self.import_raster(values)
+        self.inv_array = self._import_raster(values)
         self.inv_index = index
         if uncert is not None:
-            uncertarray = self.import_raster(uncert)
+            uncertarray = self._import_raster(uncert)
             if relative:
                 uncert_rel = self.inv_array * uncertarray / 100
                 self.inv_uncert_array = uncert_rel
             else:
                 self.inv_uncert_array = uncertarray
 
-        logger.info('Inventory <%s> with %s shape successful imported as '
+        logger.info('Inventory <%s> with %s shape successful imported from '
                     'raster array' % (self.name, self.inv_array.shape))
+
+        self._Inventory__modmtime()
+
+
+class VectorInventory(SpatialInventory):
+    """Spatial vector inventory class"""
+
+    def __init__(self, *args, **kwargs):
+        """
+        Class instance constructor with additional arguments:
+
+        For other parameters see: inventory.Inventory
+        """
+        super(VectorInventory, self).__init__(*args, **kwargs)
+
+    def _import_vector(self, infile, key, col, layer=0):
+        """ Import routine for vectorized geographical referenced datasets
+
+        The import is handled by ogr package of osgeo.
+        Attention: The vector format is limited to ESRI Shapefile support only
+
+        Keyword arguments:
+            infile    Input file name and directory as string.
+            key    Name of key column in vector file.
+            col    Name of attribute column selected for import.
+            layer    Number of vector layer. Default is 0
+        """
+
+        # Initialize ogr driver.
+        driver = ogr.GetDriverByName('ESRI Shapefile')
+        # open vector inpuf for read-only.
+        vfile = driver.Open(infile, 0)
+        if vfile is None:
+            msg = 'Unable to open vector file %s' % (infile)
+            raise ImportError(msg)
+        # Get selected vector layer.
+        try:
+            vlayer = vfile.GetLayer(layer)
+        except ImportError, e:
+            msg = 'No Layer found'
+            raise ImportError(msg)
+
+        n = vlayer.GetFeatureCount()
+        # Create attribute table with sleected column.
+        featdict = {}
+        feature = vlayer.GetNextFeature()
+        while feature:
+            featdict[feature.GetField(key)] = feature.GetField(col)
+            feature = vlayer.GetNextFeature()
+        # Print imported vector summary.
+        print "[ FEATURE COUNT ] = ", n
+        print "[ ATTRIBUTE COUNT ] = ", len(featdict)
+
+        # Get raster band data values as numpy array.
+        # rdata = rband.ReadAsArray(0, 0, cols, rows).astype(np.float)
+
+        return(np.array(featdict.values()))
+
+    def import_inventory_as_vector(self, infile, values, uncert=None,
+                                   index='cat', relative=False, layer=0):
+        """ Import vector map layer that stores spatial explicit inventory
+            values and uncertainties in form of columns for georeferenced
+            vector feature attributes.
+
+            Optionally additionally attribute columns with information of
+            inventory indices and uncertainties can be specified,
+            which represents the vector indices for the inventory components
+            and the corresponding uncertainties.
+
+            Keyword arguments:
+                infile  Input vector file name and directory as string.
+                values  Name of attribute column containing inventory data.
+                uncert  Name of attribute column containing uncertainty of
+                        inventory values stated in defined inventory unit
+                        (absolute values) as standard deviation (sigma).
+                        Relative values are possible -- See <relative> argument
+                index  Name of key column containing corresponding index values
+                       for the inventory. Per default - cat column is used.
+                relative  Boolean to activate import of percentage values of
+                          uncertainty. -> Provoke intern calculation of
+                          absolute uncertainty values.
+                layer  Number of layer containing inventory data.
+                       Default is 0.
+        """
+        self.inv_array = self._import_vector(infile, key=index, col=values,
+                                             layer=layer)
+        self.inv_index = self._import_vector(infile, key=index, col=index,
+                                             layer=layer)
+        if uncert is not None:
+            uncertarray = self._import_vector(infile, key=index, col=uncert,
+                                              layer=layer)
+            if relative:
+                uncert_rel = self.inv_array * uncertarray / 100
+                self.inv_uncert_array = uncert_rel
+            else:
+                self.inv_uncert_array = uncertarray
+
+        logger.info('Inventory <%s> with %d categories successful imported '
+                    'from vector feature layer' % (self.name,
+                                                   len(self.inv_array)))
 
         self._Inventory__modmtime()
