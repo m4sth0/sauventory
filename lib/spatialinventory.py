@@ -345,6 +345,9 @@ class VectorInventory(SpatialInventory):
         if uncert is not None:
             uncertarray = self._import_vector(infile, key=index, col=uncert,
                                               layer=layer)
+            print(uncertarray)
+            print(self.inv_array)
+            print(self.inv_index)
             if relative:
                 uncert_rel = self.inv_array * uncertarray / 100
                 self.inv_uncert_array = uncert_rel

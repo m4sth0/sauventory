@@ -96,7 +96,7 @@ class Test(unittest.TestCase):
         mi = si.check_moran()
         self.assertEqual(mi, 0.848)
 
-    def test_moran_nan2(self):
+    def test_moran_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
                                               "organic soils",

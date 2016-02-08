@@ -281,7 +281,8 @@ class Test(unittest.TestCase):
                                               creator="Tester")
 
         si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
-                                      index='NUTS_ID')
+                                      uncert='uncert_Gg', index='NUTS_ID',
+                                      relative=True)
         self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
         self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
         # self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 0.269)
