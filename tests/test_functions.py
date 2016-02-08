@@ -74,6 +74,32 @@ class Test(unittest.TestCase):
         ecdf = sf.ECDF(self.a)
         self.assertAlmostEqual(ecdf(1), 0.5, 1)
 
+    def test_weight_raster_queen(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+        si.import_inventory(self.maxrast)
+        w = si.get_weight_matrix(si.inv_array)
+        self.assertEqual(w.n, 100)
+        self.assertListEqual(w.neighbors[0], [10, 1, 11])
+        self.assertListEqual(w.weights[0], [1.0, 1.0, 1.0])
+
+    def test_weight_raster_rook(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+        si.import_inventory(self.maxrast)
+        w = si.get_weight_matrix(si.inv_array, rook=True)
+        self.assertEqual(w.n, 100)
+        self.assertListEqual(w.neighbors[0], [10, 1])
+        self.assertListEqual(w.weights[0], [1.0, 1.0])
+
     def test_moran(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
@@ -83,7 +109,7 @@ class Test(unittest.TestCase):
                                               creator="Tester")
         si.import_inventory(self.maxrast)
         mi = si.check_moran()
-        self.assertEqual(mi, 0.848)
+        self.assertEqual(round(mi, 3), 0.848)
 
     def test_moran_nan(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
@@ -94,7 +120,7 @@ class Test(unittest.TestCase):
                                               creator="Tester")
         si.import_inventory(self.nanrast)
         mi = si.check_moran()
-        self.assertEqual(mi, 0.848)
+        self.assertEqual(round(mi, 3), 0.848)
 
     def test_moran_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",

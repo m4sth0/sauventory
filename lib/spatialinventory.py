@@ -53,9 +53,15 @@ class SpatialInventory(Inventory):
         """
         Class instance constructor with additional arguments:
         mi    Morans'I value
+        invfile    Name of file containing spatial inventory data.
+        sptype    Type of spatial data. Available options are vector and raster
+                  only.
+
         For other parameters see: inventory.Inventory
         """
         self.mi = None
+        self.invfile = None
+        self.sptype = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     @property
@@ -66,15 +72,70 @@ class SpatialInventory(Inventory):
     def mi(self, mi):
         self.__mi = mi
 
-    def check_moran(self, rook=False):
+    @property
+    def invfile(self):
+        return self.__invfile
+
+    @invfile.setter
+    def invfile(self, invfile):
+        self.__invfile = invfile
+
+    @property
+    def sptype(self):
+        return self.__sptype
+
+    @sptype.setter
+    def sptype(self, sptype):
+        typelist = ['raster', 'vector', None]
+        if sptype in typelist:
+            self.__sptype = sptype
+        else:
+            msg = 'Spatial type <%s> is not supported. '
+            'Choose one of %s' % (sptype, typelist)
+            raise NameError(msg)
+
+    def get_weight_matrix(self, array, rook=False, shpfile=None):
+        """Return the spatial weight matrix based on pysal functionalities
+
+        Keyword arguments:
+            array    Numpy array with inventory values.
+            rook    Boolean to select spatial weights matrix as rook or
+                    queen case.
+            shpfile    Name of file used to setup weight matrix.
+        """
+        # Get grid dimension.
+        dim = array.shape
+        if self.sptype == 'vector':
+            try:
+                shpfile = self.invfile
+                if rook:
+                    w = pysal.rook_from_shapefile(shpfile)
+                else:
+                    w = pysal.queen_from_shapefile(shpfile)
+            except:
+                msg = "Couldn't build spatial weight matrix for vector "
+                "inventory <%s>" % (self.name)
+                raise RuntimeError(msg)
+        elif self.sptype == 'raster':
+            try:
+                # Construct weight matrix in input grid size.
+                w = pysal.lat2W(*dim, rook=rook)
+            except:
+                msg = "Couldn't build spatial weight matrix for raster "
+                "inventory <%s>" % (self.name)
+                raise RuntimeError(msg)
+
+        return(w)
+
+    def check_moran(self, rook=False, shpfile=None):
         """ Get Moran's I statistic for georeferenced inventory
 
         This method is utilizing pysal package functions for Moran's I
         statistics.
         In case of regular grid input arrays the weight matrix is
         constructed as queen's case by default.
-        Each cell (c) as only direct neighbours (n) in each direction per
-        default. Alternatively the rook type of neighbors can be choisen.
+        Each cell (c) as only direct neighbors (n) in each direction per
+        default. Alternatively the rook type of neighbors can be chosen.
         Rook:   –––––––––––    Queen:    –––––––––––
                 |- - - - -|              |- - - - -|
                 |- - n - -|              |- n n n -|
@@ -82,11 +143,14 @@ class SpatialInventory(Inventory):
                 |- - n - -|              |- n n n -|
                 |- - - - -|              |- - - - -|
                 –––––––––––              –––––––––––
-        In case of vectorized input data ...
+        In case of vectorized input data an shape file has to be passed, which
+        will be used as base for rook or queen weight matrix creation.
+        Per default the file location is taken from class argument <infile>.
 
         Keyword arguments:
             rook    Boolean to select spatial weights matrix as rook or
                     queen case.
+            shpfile    Name of file used to setup weight matrix.
         """
         # Mask nan values of input array.
         array = self.inv_array
@@ -94,11 +158,9 @@ class SpatialInventory(Inventory):
         # Get grid dimension.
         dim = array.shape
         nanids = []
-
+        # Construct weight matrix in input grid size.
+        w = self.get_weight_matrix(array, rook=rook)
         try:
-            # Construct weight matrix in input grid size.
-            w = pysal.lat2W(*dim, rook=rook)
-
             # Reshape input array to N,1 dimension.
             array = array.reshape((w.n, 1))
             # Remove weights and neighbors for nan value ids.
@@ -125,7 +187,7 @@ class SpatialInventory(Inventory):
                 # Adjust spatial weight parameters.
                 w._id_order = [ele for ele in idlist if ele not in nanids]
                 w._n = len(w.weights)
-                # Remove nan valeus from array..
+                # Remove nan valeus from array.
                 array = np.delete(array, nanids, axis=0)
 
                 logger.info("Found %d NAN values in input array -> "
@@ -152,7 +214,8 @@ class SpatialInventory(Inventory):
             print(info)
             self.mi = mi.I
         except:
-            msg = "Couldn't calculate Moran's I for inventory %s" % (self.name)
+            msg = "Couldn't calculate Moran's I for inventory "
+            "<%s>" % (self.name)
             raise RuntimeError(msg)
 
         return(self.mi)
@@ -174,6 +237,7 @@ class RasterInventory(SpatialInventory):
         For other parameters see: inventory.Inventory
         """
         super(RasterInventory, self).__init__(*args, **kwargs)
+        self.sptype = 'raster'
 
     def _import_raster(self, infile, band=1):
         """ Import routine for rasterized geographical referenced data
@@ -187,7 +251,7 @@ class RasterInventory(SpatialInventory):
         try:
             rfile = gdal.Open(infile)
         except ImportError:
-            msg = 'Unable to open raster file %s' % (infile)
+            msg = 'Unable to open raster file <%s>' % (infile)
             raise ImportError(msg)
         # Get selected raster band.
         try:
@@ -243,6 +307,10 @@ class RasterInventory(SpatialInventory):
                             Default is 1.
         """
         self.inv_array = self._import_raster(values)
+
+        # Set import file.
+        self.invfile = values
+
         self.inv_index = index
         if uncert is not None:
             uncertarray = self._import_raster(uncert)
@@ -268,8 +336,9 @@ class VectorInventory(SpatialInventory):
         For other parameters see: inventory.Inventory
         """
         super(VectorInventory, self).__init__(*args, **kwargs)
+        self.sptype = 'vector'
 
-    def _import_vector(self, infile, key, col, layer=0):
+    def _import_vector(self, infile, key, valcol, uncol=None, layer=0):
         """ Import routine for vectorized geographical referenced datasets
 
         The import is handled by ogr package of osgeo.
@@ -278,8 +347,13 @@ class VectorInventory(SpatialInventory):
         Keyword arguments:
             infile    Input file name and directory as string.
             key    Name of key column in vector file.
-            col    Name of attribute column selected for import.
+            valcol    Name of attribute column selected for inventory values.
+            uncol    Name of attribute column selected for inventory
+                     uncertainty.
             layer    Number of vector layer. Default is 0
+
+        Returns:
+            Arrays with inventory values, indices and uncertainties.
         """
 
         # Initialize ogr driver.
@@ -287,7 +361,7 @@ class VectorInventory(SpatialInventory):
         # open vector inpuf for read-only.
         vfile = driver.Open(infile, 0)
         if vfile is None:
-            msg = 'Unable to open vector file %s' % (infile)
+            msg = 'Unable to open vector file <%s>' % (infile)
             raise ImportError(msg)
         # Get selected vector layer.
         try:
@@ -296,21 +370,50 @@ class VectorInventory(SpatialInventory):
             msg = 'No Layer found'
             raise ImportError(msg)
 
+        # Get layer informations
         n = vlayer.GetFeatureCount()
-        # Create attribute table with sleected column.
-        featdict = {}
+        extent = vlayer.GetExtent()
+        spatialref = vlayer.GetSpatialRef()
+        proj = spatialref.GetAttrValue('geogcs')
+
+        # Create attribute table with selected columns.
+        featuredict = {}
+        indict = {}
+        undict = {}
         feature = vlayer.GetNextFeature()
         while feature:
-            featdict[feature.GetField(key)] = feature.GetField(col)
+            value = feature.GetField(valcol)
+            keyname = feature.GetField(key)
+
+            if uncol is None:
+                uncert = np.nan
+            else:
+                uncert = feature.GetField(uncol)
+            featuredict[feature.GetField(key)] = [value, keyname, uncert]
             feature = vlayer.GetNextFeature()
+        # Remove None key values from dictionary.
+        try:
+            del featuredict[None]
+        except:
+            pass
+        # Get inventory data as numpy array.
+        valarray = np.array([i[0] for i in featuredict.values()], dtype=float)
+        inarray = np.array([i[1] for i in featuredict.values()],
+                           dtype='string')
+        unarray = np.array([i[2] for i in featuredict.values()], dtype=float)
+
         # Print imported vector summary.
+        print "[ LAYER ] = ", layer
+        print "[ EXTENT ] = ", extent
+        print "[ PROJECTION ] = ", proj
         print "[ FEATURE COUNT ] = ", n
-        print "[ ATTRIBUTE COUNT ] = ", len(featdict)
+        print "[ KEY ATTRIBUTE COUNT ] = ", len(featuredict)
+        print "[ MIN VALUE] = ", np.nanmin(valarray)
+        print "[ MAX VALUE] = ", np.nanmax(valarray)
+        print "[ MIN UNCERTAINTY] = ", np.nanmin(unarray)
+        print "[ MAX UNCERTAINTY] = ", np.nanmax(unarray)
 
-        # Get raster band data values as numpy array.
-        # rdata = rband.ReadAsArray(0, 0, cols, rows).astype(np.float)
-
-        return(np.array(featdict.values()))
+        return(valarray, inarray, unarray)
 
     def import_inventory_as_vector(self, infile, values, uncert=None,
                                    index='cat', relative=False, layer=0):
@@ -338,21 +441,20 @@ class VectorInventory(SpatialInventory):
                 layer  Number of layer containing inventory data.
                        Default is 0.
         """
-        self.inv_array = self._import_vector(infile, key=index, col=values,
-                                             layer=layer)
-        self.inv_index = self._import_vector(infile, key=index, col=index,
-                                             layer=layer)
-        if uncert is not None:
-            uncertarray = self._import_vector(infile, key=index, col=uncert,
-                                              layer=layer)
-            print(uncertarray)
-            print(self.inv_array)
-            print(self.inv_index)
-            if relative:
-                uncert_rel = self.inv_array * uncertarray / 100
-                self.inv_uncert_array = uncert_rel
-            else:
-                self.inv_uncert_array = uncertarray
+        valarray, inarray, unarray = self._import_vector(infile, key=index,
+                                                         valcol=values,
+                                                         uncol=uncert,
+                                                         layer=layer)
+        self.inv_array = valarray
+        self.inv_index = inarray
+        if relative:
+            uncert_rel = self.inv_array * unarray / 100
+            self.inv_uncert_array = uncert_rel
+        else:
+            self.inv_uncert_array = unarray
+
+        # Set import file.
+        self.invfile = infile
 
         logger.info('Inventory <%s> with %d categories successful imported '
                     'from vector feature layer' % (self.name,

@@ -52,7 +52,7 @@ class Test(unittest.TestCase):
                         51.1, 9539.9, 4693.5, 472.6, 6171.3, 4750.5, 1315,
                         2213.5, 11596.4, 162.8]
 
-        # Corresponding list of source category describtions.
+        # Corresponding list of source category descriptions.
         self.n2o_index = ["Manure management, dairy cows",
                           "Manure management, other cattle",
                           "Manure management, pigs",
@@ -285,8 +285,24 @@ class Test(unittest.TestCase):
                                       relative=True)
         self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
         self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
-        # self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 0.269)
-        # self.assertEqual(round(np.nanmax(si.inv_uncert_array), 3), 1.387)
+        self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 33.0)
+        self.assertEqual(round(np.nanmax(si.inv_uncert_array), 3), 77535.0)
+
+    def test_inventory_vector_import_nouncert(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      index='NUTS_ID',
+                                      relative=True)
+        self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
+        self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
+        self.assertEqual(str(np.nanmin(si.inv_uncert_array)), 'nan')
+        self.assertEqual(str(np.nanmax(si.inv_uncert_array)), 'nan')
 
 if __name__ == "__main__":
     unittest.main()
