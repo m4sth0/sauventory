@@ -60,8 +60,8 @@ class Test(unittest.TestCase):
         self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
 
         # Setup test vector file names and location.
-        self.invvector = cwd + "/data/n2o_eu_2010_inventory/"
-        "n2o_eu_2010_inventory.shp"
+        self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
+                               "n2o_eu_2010_inventory.shp"
 
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
@@ -99,6 +99,23 @@ class Test(unittest.TestCase):
         self.assertEqual(w.n, 100)
         self.assertListEqual(w.neighbors[0], [10, 1])
         self.assertListEqual(w.weights[0], [1.0, 1.0])
+
+    def test_weight_vector_queen(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      index='NUTS_ID')
+
+        w = si.get_weight_matrix(si.inv_array)
+        print(si.inv_index)
+        self.assertEqual(w.n, 27)
+        self.assertListEqual(w.neighbors[0], [10, 1, 11])
+        #self.assertListEqual(w.weights[0], [1.0, 1.0, 1.0])
 
     def test_moran(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",

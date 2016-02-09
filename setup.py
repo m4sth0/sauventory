@@ -9,9 +9,9 @@ setup(name='sauventory',
       license='GPL',
       packages=['sauventory'],
       install_requires=[
-          'numpy',
           'gdal',
+          'numpy',
+          'ogr',
           'pysal',
-          'pykrige',
       ],
       zip_safe=False)

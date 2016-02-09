@@ -87,8 +87,8 @@ class Test(unittest.TestCase):
         self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
 
         # Setup test vector file names and location.
-        self.invvector = cwd + "/data/n2o_eu_2010_inventory/"
-        "n2o_eu_2010_inventory.shp"
+        self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
+                               "n2o_eu_2010_inventory.shp"
         # Data source: http://ec.europa.eu/eurostat/statistics-explained/
         # index.php/Agri-environmental_indicator_-_greenhouse_gas_emissions
 
@@ -283,9 +283,9 @@ class Test(unittest.TestCase):
         si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
                                       uncert='uncert_Gg', index='NUTS_ID',
                                       relative=True)
-        self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
+        self.assertEqual(round(np.nanmin(si.inv_array), 3), 848.0)
         self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
-        self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 33.0)
+        self.assertEqual(round(np.nanmin(si.inv_uncert_array), 3), 1272.0)
         self.assertEqual(round(np.nanmax(si.inv_uncert_array), 3), 77535.0)
 
     def test_inventory_vector_import_nouncert(self):
@@ -299,7 +299,7 @@ class Test(unittest.TestCase):
         si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
                                       index='NUTS_ID',
                                       relative=True)
-        self.assertEqual(round(np.nanmin(si.inv_array), 3), 22.0)
+        self.assertEqual(round(np.nanmin(si.inv_array), 3), 848.0)
         self.assertEqual(round(np.nanmax(si.inv_array), 3), 51690.0)
         self.assertEqual(str(np.nanmin(si.inv_uncert_array)), 'nan')
         self.assertEqual(str(np.nanmax(si.inv_uncert_array)), 'nan')
