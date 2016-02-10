@@ -32,6 +32,7 @@ relevant functions to create, handle and calculate spatial explicit inventories
 and corresponding spatial autocorrelated uncertainties.
 """
 
+from __future__ import print_function
 
 import numpy as np
 import logging
@@ -103,19 +104,33 @@ class SpatialInventory(Inventory):
                     queen case.
             shpfile    Name of file used to setup weight matrix.
         """
+        # Get case name.
+        if rook:
+            case = 'rook'
+        else:
+            case = 'queen'
         # Get grid dimension.
         dim = array.shape
         if self.sptype == 'vector':
             try:
-                shpfile = self.invfile
+                # Create weights based on shapefile topology using defined key.
+                if shpfile is None:
+                    shpfile = self.invfile
+                # Differentiat between rook and queen's case.
                 if rook:
-                    w = pysal.rook_from_shapefile(shpfile)
+                    w = pysal.rook_from_shapefile(shpfile, self.invcol)
                 else:
-                    w = pysal.queen_from_shapefile(shpfile)
+                    w = pysal.queen_from_shapefile(shpfile, self.invcol)
             except:
                 msg = "Couldn't build spatial weight matrix for vector "
                 "inventory <%s>" % (self.name)
                 raise RuntimeError(msg)
+
+            # Match weight index to inventory array index.
+            w.id_order = list(self.inv_index)
+
+            logger.info("Weight matrix in %s's case successfully calculated "
+                        "for vector dataset" % case)
         elif self.sptype == 'raster':
             try:
                 # Construct weight matrix in input grid size.
@@ -124,6 +139,16 @@ class SpatialInventory(Inventory):
                 msg = "Couldn't build spatial weight matrix for raster "
                 "inventory <%s>" % (self.name)
                 raise RuntimeError(msg)
+
+            logger.info("Weight matrix in %s's case successfully calculated "
+                        "for raster dataset" % case)
+
+        # Print imported raster summary.
+        print("[ WEIGHT NUMBER ] = ", w.n)
+        print("[ MIN NEIGHBOR ] = ", w.min_neighbors)
+        print("[ MAX NEIGHBOR ] = ", w.max_neighbors)
+        print("[ ISLANDS ] = ", *w.islands)
+        print("[ HISTOGRAM ] = ", *w.histogram)
 
         return(w)
 
@@ -165,31 +190,42 @@ class SpatialInventory(Inventory):
             array = array.reshape((w.n, 1))
             # Remove weights and neighbors for nan value ids.
             if np.any(np.isnan(array)):
-                idlist = w.id_order
+                idlist = range(len(w.id_order))
+                # Id list of weight object. !! Ids could be string objects !!
+                wid = w.id_order
+                print(idlist)
                 # Get indices for nan values in array.
                 nanids = [i for i in idlist if np.isnan(array[i])]
+                print(nanids)
+                print(wid)
                 # Remove entries from spatial weight keys for nan indices.
                 for i in nanids:
-                    del w.weights[i]
-                    del w.neighbors[i]
-                    del w.cardinalities[i]
+                    del w.weights[wid[i]]
+                    del w.neighbors[wid[i]]
+                    del w.cardinalities[wid[i]]
                 # Remove entries from spatial weight values for nan indices.
                 for lid in idlist:
                     if lid not in nanids:
-                        wlist = w.weights[lid]
-                        nlist = w.neighbors[lid]
+                        wlist = w.weights[wid[lid]]
+                        nlist = w.neighbors[wid[lid]]
+                        print(w.neighbor_offsets)
+                        #print(nlist)
                         idnonan = [nlist.index(ele) for ele in nlist
                                    if ele not in nanids]
+                        #print(idnonan)
                         wnew = [wlist[i] for i in idnonan]
                         nnew = [nlist[i] for i in idnonan]
-                        w.weights[lid] = wnew
-                        w.neighbors[lid] = nnew
+                        #print(nnew)
+                        # TODO: change w.neighbor_offsets as well!!!
+                        w.weights[wid[lid]] = wnew
+                        w.neighbors[wid[lid]] = nnew
                 # Adjust spatial weight parameters.
-                w._id_order = [ele for ele in idlist if ele not in nanids]
+                w._id_order = [wid[ele] for ele in idlist if ele not in nanids]
+                print(w.id_order)
                 w._n = len(w.weights)
-                # Remove nan valeus from array.
+                # Remove nan values from array.
                 array = np.delete(array, nanids, axis=0)
-
+                print(array)
                 logger.info("Found %d NAN values in input array -> "
                             "All will be removed prior to Moran's I statistic"
                             % (len(nanids)))
@@ -216,7 +252,7 @@ class SpatialInventory(Inventory):
         except:
             msg = "Couldn't calculate Moran's I for inventory "
             "<%s>" % (self.name)
-            raise RuntimeError(msg)
+            raise #RuntimeError(msg)
 
         return(self.mi)
 
@@ -264,15 +300,15 @@ class RasterInventory(SpatialInventory):
         rows = rfile.RasterYSize
         bands = rfile.RasterCount
         # Print imported raster summary.
-        print "[ PROJECTION ] = ", rfile.GetProjectionRef()[7:].split(',')[0]
-        print "[ ROWS ] = ", rows
-        print "[ COLUMNS ] = ", cols
-        print "[ BANDS ] = ", bands
-        print "[ NO DATA VALUE ] = ", rband.GetNoDataValue()
-        print "[ MIN ] = ", rband.GetMinimum()
-        print "[ MAX ] = ", rband.GetMaximum()
-        print "[ SCALE ] = ", rband.GetScale()
-        print "[ UNIT TYPE ] = ", rband.GetUnitType()
+        print("[ PROJECTION ] = ", rfile.GetProjectionRef()[7:].split(',')[0])
+        print("[ ROWS ] = ", rows)
+        print("[ COLUMNS ] = ", cols)
+        print("[ BANDS ] = ", bands)
+        print("[ NO DATA VALUE ] = ", rband.GetNoDataValue())
+        print("[ MIN ] = ", rband.GetMinimum())
+        print("[ MAX ] = ", rband.GetMaximum())
+        print("[ SCALE ] = ", rband.GetScale())
+        print("[ UNIT TYPE ] = ", rband.GetUnitType())
         # Get raster band data values as numpy array.
         rdata = rband.ReadAsArray(0, 0, cols, rows).astype(np.float)
 
@@ -332,11 +368,21 @@ class VectorInventory(SpatialInventory):
     def __init__(self, *args, **kwargs):
         """
         Class instance constructor with additional arguments:
+        invcol    Name of index column in import shape file.
 
         For other parameters see: inventory.Inventory
         """
         super(VectorInventory, self).__init__(*args, **kwargs)
         self.sptype = 'vector'
+        self.invcol = None
+
+    @property
+    def invcol(self):
+        return self.__invcol
+
+    @invcol.setter
+    def invcol(self, invcol):
+        self.__invcol = invcol
 
     def _import_vector(self, infile, key, valcol, uncol=None, layer=0):
         """ Import routine for vectorized geographical referenced datasets
@@ -403,15 +449,15 @@ class VectorInventory(SpatialInventory):
         unarray = np.array([i[2] for i in featuredict.values()], dtype=float)
 
         # Print imported vector summary.
-        print "[ LAYER ] = ", layer
-        print "[ EXTENT ] = ", extent
-        print "[ PROJECTION ] = ", proj
-        print "[ FEATURE COUNT ] = ", n
-        print "[ KEY ATTRIBUTE COUNT ] = ", len(featuredict)
-        print "[ MIN VALUE] = ", np.nanmin(valarray)
-        print "[ MAX VALUE] = ", np.nanmax(valarray)
-        print "[ MIN UNCERTAINTY] = ", np.nanmin(unarray)
-        print "[ MAX UNCERTAINTY] = ", np.nanmax(unarray)
+        print("[ LAYER ] = ", layer)
+        print("[ EXTENT ] = ", extent)
+        print("[ PROJECTION ] = ", proj)
+        print("[ FEATURE COUNT ] = ", n)
+        print("[ KEY ATTRIBUTE COUNT ] = ", len(featuredict))
+        print("[ MIN VALUE] = ", np.nanmin(valarray))
+        print("[ MAX VALUE] = ", np.nanmax(valarray))
+        print("[ MIN UNCERTAINTY] = ", np.nanmin(unarray))
+        print("[ MAX UNCERTAINTY] = ", np.nanmax(unarray))
 
         return(valarray, inarray, unarray)
 
@@ -455,6 +501,8 @@ class VectorInventory(SpatialInventory):
 
         # Set import file.
         self.invfile = infile
+        # Pass key column name to vector class.
+        self.invcol = index
 
         logger.info('Inventory <%s> with %d categories successful imported '
                     'from vector feature layer' % (self.name,

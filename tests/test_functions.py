@@ -112,10 +112,33 @@ class Test(unittest.TestCase):
                                       index='NUTS_ID')
 
         w = si.get_weight_matrix(si.inv_array)
-        print(si.inv_index)
         self.assertEqual(w.n, 27)
-        self.assertListEqual(w.neighbors[0], [10, 1, 11])
-        #self.assertListEqual(w.weights[0], [1.0, 1.0, 1.0])
+        self.assertListEqual(w.neighbors['DE'], [u'BE', u'AT', u'CZ', u'CH',
+                                                 u'FR', u'NL', u'PL'])
+        self.assertEqual([i for i in w.neighbors][4], 'DE')
+        self.assertEqual(si.inv_array[4], 41628)
+        self.assertEqual([i for i in w.neighbors][1], 'FR')
+        self.assertEqual(si.inv_array[1], 51690)
+
+    def test_weight_vector_rook(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      index='NUTS_ID')
+        # TODO: Queens' case histogram is not different to rook's case. Why?
+        w = si.get_weight_matrix(si.inv_array, rook=True)
+        self.assertEqual(w.n, 27)
+        self.assertListEqual(w.neighbors['DE'], [u'BE', u'AT', u'CZ', u'CH',
+                                                 u'FR', u'NL', u'PL'])
+        self.assertEqual([i for i in w.neighbors][4], 'DE')
+        self.assertEqual(si.inv_array[4], 41628)
+        self.assertEqual([i for i in w.neighbors][1], 'FR')
+        self.assertEqual(si.inv_array[1], 51690)
 
     def test_moran(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
@@ -148,6 +171,20 @@ class Test(unittest.TestCase):
                                               creator="Tester")
 
         si.import_inventory_as_raster(self.invin, self.uncertin)
+        mi = si.check_moran()
+        self.assertEqual(round(mi, 3), 0.603)
+
+    def test_moran_vector(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      uncert='uncert_Gg', index='NUTS_ID',
+                                      relative=True)
         mi = si.check_moran()
         self.assertEqual(round(mi, 3), 0.603)
 
