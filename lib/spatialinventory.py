@@ -40,6 +40,7 @@ import pysal
 import sys
 import ogr
 import gdal
+import scipy
 
 from inventory import Inventory
 
@@ -193,39 +194,41 @@ class SpatialInventory(Inventory):
                 idlist = range(len(w.id_order))
                 # Id list of weight object. !! Ids could be string objects !!
                 wid = w.id_order
-                print(idlist)
                 # Get indices for nan values in array.
                 nanids = [i for i in idlist if np.isnan(array[i])]
-                print(nanids)
-                print(wid)
-                # Remove entries from spatial weight keys for nan indices.
-                for i in nanids:
-                    del w.weights[wid[i]]
-                    del w.neighbors[wid[i]]
-                    del w.cardinalities[wid[i]]
+                nanitems = [wid[i] for i in nanids]
+                w._reset()
                 # Remove entries from spatial weight values for nan indices.
                 for lid in idlist:
                     if lid not in nanids:
                         wlist = w.weights[wid[lid]]
                         nlist = w.neighbors[wid[lid]]
-                        print(w.neighbor_offsets)
-                        #print(nlist)
+                        olist = w.neighbor_offsets[wid[lid]]
                         idnonan = [nlist.index(ele) for ele in nlist
-                                   if ele not in nanids]
-                        #print(idnonan)
+                                   if ele not in nanitems]
                         wnew = [wlist[i] for i in idnonan]
                         nnew = [nlist[i] for i in idnonan]
-                        #print(nnew)
+                        onew = [olist[i] for i in idnonan]
+                        #print(str(w.neighbors[wid[lid]]) + "----" + str(nnew))
                         # TODO: change w.neighbor_offsets as well!!!
                         w.weights[wid[lid]] = wnew
                         w.neighbors[wid[lid]] = nnew
+                        w.neighbor_offsets[wid[lid]] = onew
                 # Adjust spatial weight parameters.
                 w._id_order = [wid[ele] for ele in idlist if ele not in nanids]
-                print(w.id_order)
+                # Remove entries from spatial weight keys for nan indices.
+                for i in nanids:
+                    del w.weights[wid[i]]
+                    del w.neighbors[wid[i]]
+                    del w.neighbor_offsets[wid[i]]
+                    del w.cardinalities[wid[i]]
+                    del w.id2i[wid[i]]
+
                 w._n = len(w.weights)
+
                 # Remove nan values from array.
                 array = np.delete(array, nanids, axis=0)
-                print(array)
+                print(w.weights)
                 logger.info("Found %d NAN values in input array -> "
                             "All will be removed prior to Moran's I statistic"
                             % (len(nanids)))
