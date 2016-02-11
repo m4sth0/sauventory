@@ -140,6 +140,37 @@ class Test(unittest.TestCase):
         self.assertEqual([i for i in w.neighbors][1], 'FR')
         self.assertEqual(si.inv_array[1], 51690)
 
+    def test_remove_nan_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+        si.import_inventory(self.nanrast)
+        w = si.get_weight_matrix(si.inv_array)
+        nw, na, n = si.rm_nan_weight(w, si.inv_array)
+        self.assertEqual(w.n, 110)
+        self.assertEqual(nw.n, 100)
+        self.assertEqual(n, 10)
+
+    def test_remove_nan_vector(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      uncert='uncert_Gg', index='NUTS_ID',
+                                      relative=True)
+        w = si.get_weight_matrix(si.inv_array)
+        nw, na, n = si.rm_nan_weight(w, si.inv_array)
+        self.assertEqual(w.n, 27)
+        self.assertEqual(nw.n, 22)
+        self.assertEqual(n, 5)
+
     def test_moran(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
@@ -186,7 +217,7 @@ class Test(unittest.TestCase):
                                       uncert='uncert_Gg', index='NUTS_ID',
                                       relative=True)
         mi = si.check_moran()
-        self.assertEqual(round(mi, 3), 0.603)
+        self.assertEqual(round(mi, 3), 0.265)
 
 if __name__ == "__main__":
     unittest.main()

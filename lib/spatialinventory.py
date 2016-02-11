@@ -153,8 +153,49 @@ class SpatialInventory(Inventory):
 
         return(w)
 
+    def rm_nan_weight(self, w, array):
+        """Remove nan values from weight matrix
+
+        Keyword arguments:
+            w    Spatial weight matrix.
+            array Numpy array for inventory values.
+
+        Returns:
+            Weight matrix,array reduced by nan value entries and number of
+            NaN values.
+        """
+        # Check array shape.
+        print(array.shape)
+        if array.shape != (w.n, 1):
+            # Reshape input array to N,1 dimension.
+            array = array.reshape((w.n, 1))
+        # Get list of weight ids.
+        idlist = range(len(w.id_order))
+        # Id list of weight object. !! Ids could be string objects !!
+        wid = w.id_order
+        # Get indices for nan values in array.
+        nanarrayids = [i for i in idlist if np.isnan(array[i])]
+        nanids = [wid[i] for i in nanarrayids]
+        nonanwids = [i for i in wid if i not in nanids]
+        # Filter NaN value indecies from weight matrix dictionaries.
+        newneighbors = {i: filter(lambda x: x not in nanids, w.neighbors[i])
+                        for i in nonanwids}
+        newweights = {i: w.weights[i][:len(newneighbors[i])]
+                      for i in nonanwids}
+        # Create new weight matrix with reduced nan free items.
+        neww = pysal.W(newneighbors, newweights, nonanwids)
+        # remove nan values from corresponding input array.
+        newarray = np.array([array[i]for i in idlist if i not in nanarrayids],
+                            dtype='d')
+
+        logger.info("Found %d NAN values in input array -> "
+                    "All will be removed prior to Moran's I statistic"
+                    % (len(nanids)))
+
+        return(neww, newarray, len(nanids))
+
     def check_moran(self, rook=False, shpfile=None):
-        """ Get Moran's I statistic for georeferenced inventory
+        """Get Moran's I statistic for georeferenced inventory
 
         This method is utilizing pysal package functions for Moran's I
         statistics.
@@ -180,10 +221,7 @@ class SpatialInventory(Inventory):
         """
         # Mask nan values of input array.
         array = self.inv_array
-
-        # Get grid dimension.
-        dim = array.shape
-        nanids = []
+        nnan = 0
         # Construct weight matrix in input grid size.
         w = self.get_weight_matrix(array, rook=rook)
         try:
@@ -191,7 +229,8 @@ class SpatialInventory(Inventory):
             array = array.reshape((w.n, 1))
             # Remove weights and neighbors for nan value ids.
             if np.any(np.isnan(array)):
-                idlist = range(len(w.id_order))
+                nw, narray, nnan = self.rm_nan_weight(w, array)
+                """idlist = range(len(w.id_order))
                 # Id list of weight object. !! Ids could be string objects !!
                 wid = w.id_order
                 # Get indices for nan values in array.
@@ -228,13 +267,14 @@ class SpatialInventory(Inventory):
 
                 # Remove nan values from array.
                 array = np.delete(array, nanids, axis=0)
-                print(w.weights)
-                logger.info("Found %d NAN values in input array -> "
-                            "All will be removed prior to Moran's I statistic"
-                            % (len(nanids)))
-            # TODO: Use wsp - sparse weight matrix for large grids.
-            # Calculate Morans's statistic.
-            mi = pysal.Moran(array, w, two_tailed=False)
+                print(w.weights)"""
+                # TODO: Use wsp - sparse weight matrix for large grids.
+                # Calculate Morans's statistic with NaN purged input.
+                mi = pysal.Moran(narray, nw, two_tailed=False)
+
+            else:
+                # Calculate Morans's statistic.
+                mi = pysal.Moran(array, w, two_tailed=False)
 
             logger.info("Moran's I successfully calculated")
             # Print out info box with statistcs.
@@ -248,14 +288,14 @@ class SpatialInventory(Inventory):
                    "| p-value                : " + "%.6f" % mi.p_norm + "\n" +\
                    "| -------------------------------------------------\n" +\
                    "| Number of non-NA cells : " + str(len(array)) + "\n" +\
-                   "| Number of NA cells     : " + str(len(nanids)) + "\n" +\
+                   "| Number of NA cells     : " + str(nnan) + "\n" +\
                    "---------------------------------------------------\n"
             print(info)
             self.mi = mi.I
         except:
             msg = "Couldn't calculate Moran's I for inventory "
             "<%s>" % (self.name)
-            raise #RuntimeError(msg)
+            raise RuntimeError(msg)
 
         return(self.mi)
 
@@ -279,7 +319,7 @@ class RasterInventory(SpatialInventory):
         self.sptype = 'raster'
 
     def _import_raster(self, infile, band=1):
-        """ Import routine for rasterized geographical referenced data
+        """Import routine for rasterized geographical referenced data
 
         The import is handled by gdal package of osgeo.
         Keyword arguments:
@@ -319,31 +359,31 @@ class RasterInventory(SpatialInventory):
 
     def import_inventory_as_raster(self, values, uncert=None, index=None,
                                    relative=False, valband=1, uncertband=1):
-        """ Import raster arrays that represents spatial explicit inventory
-            values and uncertainties in form of georeferenced raster band data
-            formats.
+        """Import raster arrays that represents spatial explicit inventory
+           values and uncertainties in form of georeferenced raster band data
+           formats.
 
-            Optionally additionally arrays with information of
-            inventory indices and uncertainties can be attached,
-            Which represents the raster indices for the pixel values and
-            the corresponding uncertainties of the inventory raster cells.
+        Optionally additionally arrays with information of
+        inventory indices and uncertainties can be attached,
+        Which represents the raster indices for the pixel values and
+        the corresponding uncertainties of the inventory raster cells.
 
-            Keyword arguments:
-                values  Input raster file representing inventory values,
-                        that are stated in defined inventory unit.
-                uncert  Input file representing uncertainty of
-                        inventory values stated in defined inventory unit
-                        (absolute values) as standard deviation (sigma).
-                        Relative values are possible -- See <relative> argument
-                index  Numpy array containing corresponding indices
-                       Per default - increasing numbering is used.
-                relative  Boolean to activate import of percentage values of
-                          uncertainty. -> Provoke intern calculation of
-                          absolute uncertainty values.
-                valband  Raster band number containing inventory data.
-                         Default is 1.
-                uncertband  Raster band number containing uncertainty data.
-                            Default is 1.
+        Keyword arguments:
+            values  Input raster file representing inventory values,
+                    that are stated in defined inventory unit.
+            uncert  Input file representing uncertainty of
+                    inventory values stated in defined inventory unit
+                    (absolute values) as standard deviation (sigma).
+                    Relative values are possible -- See <relative> argument
+            index  Numpy array containing corresponding indices
+                   Per default - increasing numbering is used.
+            relative  Boolean to activate import of percentage values of
+                      uncertainty. -> Provoke intern calculation of
+                      absolute uncertainty values.
+            valband  Raster band number containing inventory data.
+                     Default is 1.
+            uncertband  Raster band number containing uncertainty data.
+                        Default is 1.
         """
         self.inv_array = self._import_raster(values)
 
@@ -388,7 +428,7 @@ class VectorInventory(SpatialInventory):
         self.__invcol = invcol
 
     def _import_vector(self, infile, key, valcol, uncol=None, layer=0):
-        """ Import routine for vectorized geographical referenced datasets
+        """Import routine for vectorized geographical referenced datasets
 
         The import is handled by ogr package of osgeo.
         Attention: The vector format is limited to ESRI Shapefile support only
@@ -466,29 +506,29 @@ class VectorInventory(SpatialInventory):
 
     def import_inventory_as_vector(self, infile, values, uncert=None,
                                    index='cat', relative=False, layer=0):
-        """ Import vector map layer that stores spatial explicit inventory
+        """Import vector map layer that stores spatial explicit inventory
             values and uncertainties in form of columns for georeferenced
             vector feature attributes.
 
-            Optionally additionally attribute columns with information of
-            inventory indices and uncertainties can be specified,
-            which represents the vector indices for the inventory components
-            and the corresponding uncertainties.
+        Optionally additionally attribute columns with information of
+        inventory indices and uncertainties can be specified,
+        which represents the vector indices for the inventory components
+        and the corresponding uncertainties.
 
-            Keyword arguments:
-                infile  Input vector file name and directory as string.
-                values  Name of attribute column containing inventory data.
-                uncert  Name of attribute column containing uncertainty of
-                        inventory values stated in defined inventory unit
-                        (absolute values) as standard deviation (sigma).
-                        Relative values are possible -- See <relative> argument
-                index  Name of key column containing corresponding index values
-                       for the inventory. Per default - cat column is used.
-                relative  Boolean to activate import of percentage values of
-                          uncertainty. -> Provoke intern calculation of
-                          absolute uncertainty values.
-                layer  Number of layer containing inventory data.
-                       Default is 0.
+        Keyword arguments:
+            infile  Input vector file name and directory as string.
+            values  Name of attribute column containing inventory data.
+            uncert  Name of attribute column containing uncertainty of
+                    inventory values stated in defined inventory unit
+                    (absolute values) as standard deviation (sigma).
+                    Relative values are possible -- See <relative> argument
+            index  Name of key column containing corresponding index values
+                   for the inventory. Per default - cat column is used.
+            relative  Boolean to activate import of percentage values of
+                      uncertainty. -> Provoke intern calculation of
+                      absolute uncertainty values.
+            layer  Number of layer containing inventory data.
+                   Default is 0.
         """
         valarray, inarray, unarray = self._import_vector(infile, key=index,
                                                          valcol=values,
