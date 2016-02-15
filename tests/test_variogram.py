@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright (c) 2016
-from scipy.spatial.distance import pdist
 
 # Author(s):
 
@@ -30,7 +29,9 @@ from scipy.spatial.distance import pdist
 This module perform unittests for variogram functions within the
 sauventory package.
 """
+from __future__ import print_function
 
+import itertools
 import numpy as np
 import os
 import random
@@ -78,7 +79,13 @@ class Test(unittest.TestCase):
         si.import_inventory_as_raster(self.invin, self.uncertin)
         v = variogram.Variogram()
         shp = si.inv_array.shape
-        input = np.array([[range(shp[0]), range(shp[1]), si.inv_array]])
-        sv = v.semivvarh(input, 10, 5)
+        coords = itertools.product(range(shp[0]), range(shp[1]))
+        acoords = np.array(map(np.asarray, coords))
+        data = np.hstack((acoords, si.inv_array.reshape((si.inv_array.size, 1))))
+        sv = v.semivvarh(data, 1, 1)
+        print(sv)
+        sv = v.semivvarh(data, 10, 5)
+        print(sv)
+
 if __name__ == "__main__":
     unittest.main()

@@ -57,7 +57,9 @@ class Variogram(object):
         '''Experimental semivariogram for a single lag.
 
         Keyword arguments:
-            P    Input data array
+            P    Input data array n x (x , y, v) with n number of rows with two
+                 dimensional coordinates (x, y) and corresponding value (v) for
+                 local observation.
             h    Lag distance
             bw    Bandwise
 
@@ -66,13 +68,15 @@ class Variogram(object):
         '''
         pd = squareform(pdist(P[:, :2]))
         N = pd.shape[0]
-        print(N)
         Z = list()
         for i in range(N):
             for j in range(i+1, N):
                 if(pd[i, j] >= h - bw) and (pd[i, j] <= h + bw):
                     Z.append((P[i, 2] - P[j, 2])**2.0)
-        return np.sum(Z) / (2.0 * len(Z))
+        # Calculate semivariance.
+        nnan = len(np.invert(np.isnan(Z)))
+        sv = np.nansum(Z) / (2.0 * nnan)
+        return(sv)
 
     def semivvar(self, P, hs, bw):
         '''
