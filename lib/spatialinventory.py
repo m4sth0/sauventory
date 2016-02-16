@@ -34,6 +34,7 @@ and corresponding spatial autocorrelated uncertainties.
 
 from __future__ import print_function
 
+import itertools
 import numpy as np
 import logging
 import pysal
@@ -58,12 +59,14 @@ class SpatialInventory(Inventory):
         invfile    Name of file containing spatial inventory data.
         sptype    Type of spatial data. Available options are vector and raster
                   only.
+        inv_coord    Numpy array containing coordinates of spatial features.
 
         For other parameters see: inventory.Inventory
         """
         self.mi = None
         self.invfile = None
         self.sptype = None
+        self.inv_coord = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     @property
@@ -95,6 +98,14 @@ class SpatialInventory(Inventory):
             msg = 'Spatial type <%s> is not supported. '
             'Choose one of %s' % (sptype, typelist)
             raise NameError(msg)
+
+    @property
+    def inv_coord(self):
+        return self.__inv_coord
+
+    @inv_coord.setter
+    def inv_coord(self, inv_coord):
+        self.__inv_coord = inv_coord
 
     def get_weight_matrix(self, array, rook=False, shpfile=None):
         """Return the spatial weight matrix based on pysal functionalities
@@ -299,6 +310,25 @@ class SpatialInventory(Inventory):
 
         return(self.mi)
 
+    def get_coord(self):
+        """Return array of coordinates for spatial dataset"""
+        try:
+            # Get coordinates by spatial type.
+            if self.sptype == 'raster' and self.inv_coord is None:
+                shp = self.inv_array.shape
+                coords = itertools.product(range(shp[0]), range(shp[1]))
+                result = np.array(map(np.asarray, coords))
+            elif self.sptype == 'raster' and self.inv_coord is not None:
+                result = self.inv_coord
+            elif self.sptype == 'vector':
+                result = self.inv_coord
+        except:
+            msg = "Couldn't get coordinates for inventory "
+            "<%s>" % (self.name)
+            raise RuntimeError(msg)
+
+        return(result)
+
     def get_variogram(self):
         """Get variogram function for spatial inventory values"""
 
@@ -455,7 +485,7 @@ class VectorInventory(SpatialInventory):
         # Get selected vector layer.
         try:
             vlayer = vfile.GetLayer(layer)
-        except ImportError, e:
+        except ImportError:
             msg = 'No Layer found'
             raise ImportError(msg)
 
@@ -467,18 +497,33 @@ class VectorInventory(SpatialInventory):
 
         # Create attribute table with selected columns.
         featuredict = {}
-        indict = {}
-        undict = {}
+        coorddict = {}
         feature = vlayer.GetNextFeature()
         while feature:
             value = feature.GetField(valcol)
             keyname = feature.GetField(key)
-
+            geometry = feature.GetGeometryRef()
+            # Save coordinates to class object.
+            gtype = geometry.GetGeometryType()
+            if gtype == 1:  # Point feature object
+                x = geometry.GetX()
+                y = geometry.GetY()
+            elif gtype == 3:  # Polygon feature object
+                cent = geometry.Centroid()
+                x = cent.GetX()
+                y = cent.GetY()
+            else:
+                x = None
+                y = None
+            # Create attribute data dictionaries.
             if uncol is None:
                 uncert = np.nan
             else:
                 uncert = feature.GetField(uncol)
             featuredict[feature.GetField(key)] = [value, keyname, uncert]
+            coorddict[feature.GetField(key)] = np.array([x, y])
+            # Remove feature object to free memory and continue.
+            feature.Destroy()
             feature = vlayer.GetNextFeature()
         # Remove None key values from dictionary.
         try:
@@ -490,6 +535,9 @@ class VectorInventory(SpatialInventory):
         inarray = np.array([i[1] for i in featuredict.values()],
                            dtype='string')
         unarray = np.array([i[2] for i in featuredict.values()], dtype=float)
+        coarray = np.array([i for i in coorddict.values()], dtype=float)
+        # Remove data source object to free memory.
+        vfile.Destroy()
 
         # Print imported vector summary.
         print("[ LAYER ] = ", layer)
@@ -502,7 +550,7 @@ class VectorInventory(SpatialInventory):
         print("[ MIN UNCERTAINTY] = ", np.nanmin(unarray))
         print("[ MAX UNCERTAINTY] = ", np.nanmax(unarray))
 
-        return(valarray, inarray, unarray)
+        return(valarray, inarray, unarray, coarray)
 
     def import_inventory_as_vector(self, infile, values, uncert=None,
                                    index='cat', relative=False, layer=0):
@@ -530,17 +578,21 @@ class VectorInventory(SpatialInventory):
             layer  Number of layer containing inventory data.
                    Default is 0.
         """
-        valarray, inarray, unarray = self._import_vector(infile, key=index,
-                                                         valcol=values,
-                                                         uncol=uncert,
-                                                         layer=layer)
-        self.inv_array = valarray
-        self.inv_index = inarray
+        valarr, inarr, unarr, coarr = self._import_vector(infile,
+                                                          key=index,
+                                                          valcol=values,
+                                                          uncol=uncert,
+                                                          layer=layer)
+        # Setting class objects.
+        self.inv_array = valarr
+        self.inv_index = inarr
+        self.inv_coord = coarr
+
         if relative:
-            uncert_rel = self.inv_array * unarray / 100
+            uncert_rel = self.inv_array * unarr / 100
             self.inv_uncert_array = uncert_rel
         else:
-            self.inv_uncert_array = unarray
+            self.inv_uncert_array = unarr
 
         # Set import file.
         self.invfile = infile

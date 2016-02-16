@@ -31,7 +31,7 @@ sauventory package.
 """
 from __future__ import print_function
 
-import itertools
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
@@ -55,20 +55,7 @@ class Test(unittest.TestCase):
         self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
                                "n2o_eu_2010_inventory.shp"
 
-        # part of our data set recording porosity
-        #P = np.array( z[['x','y','por']] )
-        # bandwidth, plus or minus 250 meters
-        #bw = 500
-        # lags in 500 meter increments from zero to 10,000
-        #hs = np.arange(0,10500,bw)
-        #sv = SV( P, hs, bw )
-        #plot( sv[0], sv[1], '.-' )
-        #xlabel('Lag [m]')
-        #ylabel('Semivariance')
-        #title('Sample Semivariogram') ;
-        #savefig('sample_semivariogram.png',fmt='png',dpi=200)
-
-    def test_basic_variogram(self):
+    def test_single_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
                                               "organic soils",
@@ -78,14 +65,96 @@ class Test(unittest.TestCase):
 
         si.import_inventory_as_raster(self.invin, self.uncertin)
         v = variogram.Variogram()
-        shp = si.inv_array.shape
-        coords = itertools.product(range(shp[0]), range(shp[1]))
-        acoords = np.array(map(np.asarray, coords))
-        data = np.hstack((acoords, si.inv_array.reshape((si.inv_array.size, 1))))
-        sv = v.semivvarh(data, 1, 1)
-        print(sv)
-        sv = v.semivvarh(data, 10, 5)
-        print(sv)
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        sv1 = v.semivvarh(data, 5, 5)
+        sv2 = v.semivvarh(data, 50, 5)
+        self.assertEqual(round(sv1, 3), 0.168)
+        self.assertEqual(round(sv2, 3), 0.217)
+
+    def test_single_variogram_vector(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      uncert='uncert_Gg', index='NUTS_ID',
+                                      relative=True)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        sv1 = v.semivvarh(data, 10, 8)
+        sv2 = v.semivvarh(data, 20, 8)
+        self.assertEqual(round(sv1, 3), 136703201.471)
+        self.assertEqual(round(sv2, 3), 145110190.277)
+
+    def test_empirical_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        svario = v.semivvar(data, hs, bw)
+        self.assertEqual(round(np.max(svario[1]), 3), 0.245)
+        self.assertEqual(round(np.min(svario[1]), 3), 0.168)
+
+        # Plot variogram.
+        plt.plot(svario[0], svario[1])
+        plt.xlabel('Lag [m]')
+        plt.ylabel('Semivariance')
+        plt.title('Semivariogram for raster sample')
+        axes = list(plt.axis())
+        axes[2] = 0
+        plt.axis(axes)
+        plt.show()
+
+    def test_empirical_variogram_vector(self):
+        si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
+                                              "N2O inventory for EU-27"
+                                              "emissions from agriculture",
+                                              ("2010-01-01 00:00:00",
+                                               "2011-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_vector(self.invvector, 'n2o_Gg',
+                                      uncert='uncert_Gg', index='NUTS_ID',
+                                      relative=True)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        svario = v.semivvar(data, hs, bw)
+        self.assertEqual(round(np.max(svario[1]), 3), 142924111.258)
+        self.assertEqual(round(np.min(svario[1]), 3), 16520.533)
+
+        # Plot variogram.
+        plt.plot(svario[0], svario[1])
+        plt.xlabel('Lag [m]')
+        plt.ylabel('Semivariance')
+        plt.title('Semivariogram for vector sample')
+        axes = list(plt.axis())
+        axes[2] = 0
+        plt.axis(axes)
+        plt.show()
 
 if __name__ == "__main__":
     unittest.main()
