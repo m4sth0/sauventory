@@ -155,6 +155,14 @@ class Test(unittest.TestCase):
         axes[2] = 0
         plt.axis(axes)
         plt.show()
-
+    """
+    sp = cvmodel( P, model=spherical, hs=np.arange(0,10500,500), bw=500 )
+    plot( sv[0], sv[1], '.-' )
+    plot( sv[0], sp( sv[0] ) ) ;
+    title('Spherical Model')
+    ylabel('Semivariance')
+    xlabel('Lag [m]')
+    savefig('semivariogram_model.png',fmt='png',dpi=200)
+    """
 if __name__ == "__main__":
     unittest.main()
