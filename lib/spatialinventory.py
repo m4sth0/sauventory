@@ -395,14 +395,23 @@ class SpatialInventory(Inventory):
         plt.title('Semivariogram for inventory <%s>' % (self.name))
         plt.xlabel('Lag [m]')
         plt.ylabel('Semivariance')
-        plt.title('Spherical semivariogram model for raster sample')
+        plt.title('Spherical semivariogram model for inventory <>' %
+                  (self.name))
         axes = list(plt.axis())
         axes[2] = 0
         plt.axis(axes)
         plt.show()
 
     def get_cov_matrix(self):
-        """Create covariance matrix of spatial auto correlated inventory"""
+        """Create covariance matrix of spatial auto correlated inventory
+
+        This function utilizes a semivariogram model to estimate the 
+        covariance matrix under the assumption of second order statinarity.
+        """
+        # Calculate variogram funciton
+        # Estimate semivariances for each pair of inventory elements.
+        # Convert semi variances to covariances under 2nd order stationarity.
+        # Fill in sparse covariance matrix
 
 
 class RasterInventory(SpatialInventory):
