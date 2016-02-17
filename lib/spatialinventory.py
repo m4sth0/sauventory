@@ -44,6 +44,7 @@ import gdal
 import scipy
 
 from inventory import Inventory
+import variogram
 
 # Configure logger.
 logger = logging.getLogger('spatialinventory')
@@ -60,6 +61,8 @@ class SpatialInventory(Inventory):
         sptype    Type of spatial data. Available options are vector and raster
                   only.
         inv_coord    Numpy array containing coordinates of spatial features.
+        inv_sv    Empirical semivariogram ndarray.
+        inv_svmodel    Fitted Semivariogram function.
 
         For other parameters see: inventory.Inventory
         """
@@ -67,6 +70,8 @@ class SpatialInventory(Inventory):
         self.invfile = None
         self.sptype = None
         self.inv_coord = None
+        self.inv_sv = None
+        self.inv_svmodel = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     @property
@@ -106,6 +111,22 @@ class SpatialInventory(Inventory):
     @inv_coord.setter
     def inv_coord(self, inv_coord):
         self.__inv_coord = inv_coord
+
+    @property
+    def inv_sv(self):
+        return self.__inv_sv
+
+    @inv_sv.setter
+    def inv_sv(self, inv_sv):
+        self.__inv_sv = inv_sv
+
+    @property
+    def inv_svmodel(self):
+        return self.__inv_svmodel
+
+    @inv_svmodel.setter
+    def inv_svmodel(self, inv_svmodel):
+        self.__inv_svmodel = inv_svmodel
 
     def get_weight_matrix(self, array, rook=False, shpfile=None):
         """Return the spatial weight matrix based on pysal functionalities
@@ -329,8 +350,56 @@ class SpatialInventory(Inventory):
 
         return(result)
 
-    def get_variogram(self):
-        """Get variogram function for spatial inventory values"""
+    def get_variogram(self, bw, hmax, model=False, type=None):
+        """Get variogram function for spatial inventory values
+
+        Keyword arguments:
+            bw    Bandwidth of distances
+            hmax    Maximum distance
+            model    Boolean if semivariogram model is computed.
+                     Default is False
+            type    Model type as variogram function object. Default is None.
+        """
+        v = variogram.Variogram()
+        coords = self.get_coord()
+        data = np.hstack((coords, self.inv_array.reshape((self.inv_array.size,
+                                                          1))))
+        hs = np.arange(0, hmax, bw)  # Distance intervals
+
+        if model and type is None:
+            svmodel, sv = v.cvmodel(data, hs, bw, v.spherical)
+        elif model and type is not None:
+            svmodel, sv = v.cvmodel(data, hs, bw, model=type)
+        else:
+            sv = v.semivvar(data, hs, bw)
+
+        # Assign semivariogram as class objects
+        self.inv_sv = sv
+        if model:
+            self.inv_svmodel = svmodel
+
+        return(self.inv_sv, self.inv_svmodel)
+
+    def plot_variogram(self):
+        """Plot variogram for inventory"""
+        import matplotlib.pyplot as plt
+        if self.inv_sv is None:
+            msg = "No semivariogram found for inventory <%s>. "\
+                  "Use get_variogram function to generate it" % (self.name)
+            raise ValueError(msg)
+        sv = self.inv_sv
+        svmodel = self.inv_svmodel
+        plt.plot(sv[0], sv[1], '.-')
+        if svmodel is not None:
+            plt.plot(sv[0], svmodel(sv[0]))
+        plt.title('Semivariogram for inventory <%s>' % (self.name))
+        plt.xlabel('Lag [m]')
+        plt.ylabel('Semivariance')
+        plt.title('Spherical semivariogram model for raster sample')
+        axes = list(plt.axis())
+        axes[2] = 0
+        plt.axis(axes)
+        plt.show()
 
     def get_cov_matrix(self):
         """Create covariance matrix of spatial auto correlated inventory"""

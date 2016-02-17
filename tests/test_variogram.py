@@ -113,16 +113,6 @@ class Test(unittest.TestCase):
         self.assertEqual(round(np.max(svario[1]), 3), 0.245)
         self.assertEqual(round(np.min(svario[1]), 3), 0.168)
 
-        # Plot variogram.
-        plt.plot(svario[0], svario[1])
-        plt.xlabel('Lag [m]')
-        plt.ylabel('Semivariance')
-        plt.title('Semivariogram for raster sample')
-        axes = list(plt.axis())
-        axes[2] = 0
-        plt.axis(axes)
-        plt.show()
-
     def test_empirical_variogram_vector(self):
         si = spatialinventory.VectorInventory("N2O-Agrar-EU-2010", "Gg",
                                               "N2O inventory for EU-27"
@@ -147,7 +137,7 @@ class Test(unittest.TestCase):
         self.assertEqual(round(np.min(svario[1]), 3), 16520.533)
 
         # Plot variogram.
-        plt.plot(svario[0], svario[1])
+        plt.plot(svario[0], svario[1], '.-')
         plt.xlabel('Lag [m]')
         plt.ylabel('Semivariance')
         plt.title('Semivariogram for vector sample')
@@ -155,13 +145,59 @@ class Test(unittest.TestCase):
         axes[2] = 0
         plt.axis(axes)
         plt.show()
+
+    def test_get_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        sv, svm = si.get_variogram(10, 80, False)
+        self.assertEqual(round(np.max(sv[1]), 3), 0.245)
+        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
+
+    def test_plot_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        sv, svm = si.get_variogram(10, 80, True)
+        self.assertEqual(round(np.max(sv[1]), 3), 0.245)
+        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
+        si.plot_variogram()
+
+    def test_spherical_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        # svario = v.semivvar(data, hs, bw)
+        svmodel, svario = v.cvmodel(data, hs, bw, model=v.spherical)
+        self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
+        self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
+
     """
     sp = cvmodel( P, model=spherical, hs=np.arange(0,10500,500), bw=500 )
     plot( sv[0], sv[1], '.-' )
     plot( sv[0], sp( sv[0] ) ) ;
-    title('Spherical Model')
-    ylabel('Semivariance')
-    xlabel('Lag [m]')
     savefig('semivariogram_model.png',fmt='png',dpi=200)
     """
 if __name__ == "__main__":

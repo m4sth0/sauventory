@@ -89,57 +89,62 @@ class Variogram(object):
         return np.array(sv).T
 
     def c(self, P, h, bw):
-        """
-        Calculate the sill
-        """
-        c0 = np.var(P[:, 2])
+        """Calculate the sill"""
+        c0 = np.nanvar(P[:, 2])
         if h == 0:
             return c0
         return c0 - self.semivvarh(P, h, bw)
 
-    def opt(self, fct, x, y, C0, parameterRange=None, meshSize=1000):
+    def opt(self, fct, x, y, c0, parameterRange=None, meshSize=1000):
         if parameterRange is None:
             parameterRange = [x[1], x[-1]]
         mse = np.zeros(meshSize)
         a = np.linspace(parameterRange[0], parameterRange[1], meshSize)
         for i in range(meshSize):
-            mse[i] = np.mean((y - fct(x, a[i], C0))**2.0)
+            mse[i] = np.mean((y - fct(x, a[i], c0))**2.0)
         return a[mse.argmin()]
 
-    def spherical(self, h, a, C0):
+    def spherical(self, h, a, c0):
         """Spherical model of the semivariogram"""
         # if h is a single digit
         if type(h) == np.float64:
             # calculate the spherical function
             if h <= a:
-                return C0*(1.5*h/a - 0.5*(h/a)**3.0)
+                return c0*(1.5*h/a - 0.5*(h/a)**3.0)
             else:
-                return C0
+                return c0
         # if h is an iterable
         else:
             # Calcualte the spherical function for all elements
             a = np.ones(h.size) * a
-            C0 = np.ones(h.size) * C0
-            return map(self.spherical, h, a, C0)
+            c0 = np.ones(h.size) * c0
+            return map(self.spherical, h, a, c0)
 
-    def cvmodel(self, P, model, hs, bw):
+    def cvmodel(self, P, hs, bw, model):
+        """ Model semivariances with specific functions.
+
+        Keyword arguments:
+            P    ndarray with data
+            hs     ndarray with distances
+            bw     Bandwidth - hs +- bw / 2
+            model  Optional modeling function: spherical, exponential,
+                   or gaussian. Default is spherical.
+
+        Return:
+            covfct    Covariance function
         """
-        Input:  (P)      ndarray, data
-                (model)  modeling function
-                          - spherical
-                          - exponential
-                          - gaussian
-                (hs)     distances
-                (bw)     bandwidth
-        Output: (covfct) function modeling the covariance
-        """
-        # calculate the semivariogram
+        models = [self.spherical]
+        if model not in models:
+            msg = "Model type <%s> not known. Use the following options %s" % \
+                  (model, models)
+            raise ValueError(msg)
+        # Calculate the semivariogram
         sv = self.semivvar(P, hs, bw)
-        # calculate the sill
-        C0 = self.c(P, hs[0], bw)
-        # calculate the optimal parameters
-        param = self.opt(model, sv[0], sv[1], C0)
-        # return a covariance function
-        covfct = lambda h, a=param: C0 - model(h, a, C0)
+        # Calculate the sill
+        c0 = self.c(P, hs[0], bw)
+        # Calculate the optimal parameters
+        param = self.opt(model, sv[0], sv[1], c0)
+        # Return a covariance function
+        covfct = lambda h, a=param: model(h, a, c0)
 
-        return covfct
+        return covfct, sv
