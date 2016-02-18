@@ -339,6 +339,7 @@ class SpatialInventory(Inventory):
                 shp = self.inv_array.shape
                 coords = itertools.product(range(shp[0]), range(shp[1]))
                 result = np.array(map(np.asarray, coords))
+                self.inv_coord = result
             elif self.sptype == 'raster' and self.inv_coord is not None:
                 result = self.inv_coord
             elif self.sptype == 'vector':
@@ -350,12 +351,12 @@ class SpatialInventory(Inventory):
 
         return(result)
 
-    def get_variogram(self, bw, hmax, model=False, type=None):
+    def get_variogram(self, bw=None, hmax=None, model=False, type=None):
         """Get variogram function for spatial inventory values
 
         Keyword arguments:
-            bw    Bandwidth of distances
-            hmax    Maximum distance
+            bw    Bandwidth of distances. Defualt is tenth of maximum distance
+            hmax    Maximum distance. Default is maximum distance found.
             model    Boolean if semivariogram model is computed.
                      Default is False
             type    Model type as variogram function object. Default is None.
@@ -364,6 +365,15 @@ class SpatialInventory(Inventory):
         coords = self.get_coord()
         data = np.hstack((coords, self.inv_array.reshape((self.inv_array.size,
                                                           1))))
+        # Compute maximum distance of coordinates per default.
+        if hmax is None:
+            from scipy.spatial.distance import pdist
+            distvalues = pdist(coords)
+            hmax = max(distvalues)
+            logger.info("Maximum distance of variogram set to <%d>" % (hmax))
+        # Compute standard bandwidth if required.
+        if bw is None:
+            bw = hmax / 10  # Use tenth distance steps.
         hs = np.arange(0, hmax, bw)  # Distance intervals
 
         if model and type is None:
@@ -375,9 +385,10 @@ class SpatialInventory(Inventory):
 
         # Assign semivariogram as class objects
         self.inv_sv = sv
+        logger.info("Empirical variogram successfully calculated")
         if model:
             self.inv_svmodel = svmodel
-
+            logger.info("Theoretical variogram successfully calculated")
         return(self.inv_sv, self.inv_svmodel)
 
     def plot_variogram(self):
@@ -395,23 +406,54 @@ class SpatialInventory(Inventory):
         plt.title('Semivariogram for inventory <%s>' % (self.name))
         plt.xlabel('Lag [m]')
         plt.ylabel('Semivariance')
-        plt.title('Spherical semivariogram model for inventory <>' %
+        plt.title('Spherical semivariogram model for inventory <%s>' %
                   (self.name))
         axes = list(plt.axis())
         axes[2] = 0
         plt.axis(axes)
         plt.show()
 
-    def get_cov_matrix(self):
+    def get_cov_matrix(self, lim=None):
         """Create covariance matrix of spatial auto correlated inventory
 
-        This function utilizes a semivariogram model to estimate the 
-        covariance matrix under the assumption of second order statinarity.
+        This function utilizes a semivariogram model to estimate the
+        covariance matrix under the assumption of second order stationarity.
+
+        Thereby, the matrix is stored as sparse matrix to reduce used memory.
+        NaN values are excluded and set to zero
+
+        Keyword arguments:
+            lim    threshold for covariance. Lower values will be set to zero.
         """
-        # Calculate variogram funciton
+        from scipy.sparse import lil_matrix, csr_matrix, coo_matrix
+        from scipy.spatial.distance import pdist
+        from scipy.spatial.distance import squareform
+
+        if self.inv_svmodel is None:
+            # Calculate variogram function with standard parameters
+            pass
+            logger.info("No variogram object found. Calculate variogram "
+                        "function with standard parameters")
+            self.get_variogram(model=True)
+
+        # Get size of inventory and create sparse matrix.
+        n = self.inv_array.size
+        covmat = lil_matrix((n, n))
+        covmat.setdiag(np.ones(n))
+        # Get distances of inventory values and calculate covariances.
+        coords = self.get_coord()
+        print(len(coords))
+        dval = pdist(coords)
+        dmat = squareform(dval)
+        print(dmat.shape)
+        print(covmat[0, 1])
+        coomat = coo_matrix(covmat)
+        for prod in itertools.product(xrange(n), xrange(n)):
+            #svmat = map(self.inv_svmodel, dmat[0])
+            # print(covmat[prod[0], prod[1]])
         # Estimate semivariances for each pair of inventory elements.
         # Convert semi variances to covariances under 2nd order stationarity.
-        # Fill in sparse covariance matrix
+        # Store values in sparse covariance matrix
 
 
 class RasterInventory(SpatialInventory):

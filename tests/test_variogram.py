@@ -135,7 +135,7 @@ class Test(unittest.TestCase):
         svario = v.semivvar(data, hs, bw)
         self.assertEqual(round(np.max(svario[1]), 3), 142924111.258)
         self.assertEqual(round(np.min(svario[1]), 3), 16520.533)
-
+        """
         # Plot variogram.
         plt.plot(svario[0], svario[1], '.-')
         plt.xlabel('Lag [m]')
@@ -144,34 +144,7 @@ class Test(unittest.TestCase):
         axes = list(plt.axis())
         axes[2] = 0
         plt.axis(axes)
-        plt.show()
-
-    def test_get_variogram_raster(self):
-        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
-                                              "Example N2O inventory of "
-                                              "organic soils",
-                                              ("2012-01-01 00:00:00",
-                                               "2013-01-01 00:00:00"),
-                                              creator="Tester")
-
-        si.import_inventory_as_raster(self.invin, self.uncertin)
-        sv, svm = si.get_variogram(10, 80, False)
-        self.assertEqual(round(np.max(sv[1]), 3), 0.245)
-        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
-
-    def test_plot_variogram_raster(self):
-        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
-                                              "Example N2O inventory of "
-                                              "organic soils",
-                                              ("2012-01-01 00:00:00",
-                                               "2013-01-01 00:00:00"),
-                                              creator="Tester")
-
-        si.import_inventory_as_raster(self.invin, self.uncertin)
-        sv, svm = si.get_variogram(10, 80, True)
-        self.assertEqual(round(np.max(sv[1]), 3), 0.245)
-        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
-        si.plot_variogram()
+        plt.show()"""
 
     def test_spherical_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",

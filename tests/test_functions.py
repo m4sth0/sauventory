@@ -62,7 +62,7 @@ class Test(unittest.TestCase):
         # Setup test vector file names and location.
         self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
                                "n2o_eu_2010_inventory.shp"
-
+    """
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
         f2 = sf.StepFunction(self.x, self.y, side='right')
@@ -218,6 +218,46 @@ class Test(unittest.TestCase):
                                       relative=True)
         mi = si.check_moran()
         self.assertEqual(round(mi, 3), 0.265)
+
+    def test_get_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        sv, svm = si.get_variogram(10)
+        self.assertEqual(round(np.max(sv[1]), 3), 0.228)
+        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
+
+    def test_plot_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        sv, svm = si.get_variogram(10, 80, True)
+        self.assertEqual(round(np.max(sv[1]), 3), 0.245)
+        self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
+        si.plot_variogram()
+    """
+    def test_get_cov_matrix_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        si.get_cov_matrix()
+        # self.assertEqual(round(np.max(sv[1]), 3), 0.245)
+        # self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
 
 if __name__ == "__main__":
     unittest.main()
