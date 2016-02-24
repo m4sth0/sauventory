@@ -107,7 +107,8 @@ class Variogram(object):
     def spherical(self, h, a, c0):
         """Spherical model of the semivariogram"""
         # if h is a single digit
-        if type(h) == np.float64:
+        # TODO: Check performance of float type.
+        if type(h) in [np.float64, float]:
             # calculate the spherical function
             if h <= a:
                 return c0*(1.5*h/a - 0.5*(h/a)**3.0)
@@ -132,6 +133,8 @@ class Variogram(object):
 
         Return:
             covfct    Covariance function
+            sv    semivariogram
+            c0    sill value
         """
         models = [self.spherical]
         if model not in models:
@@ -147,4 +150,4 @@ class Variogram(object):
         # Return a covariance function
         covfct = lambda h, a=param: model(h, a, c0)
 
-        return covfct, sv
+        return covfct, sv, c0

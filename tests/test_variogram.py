@@ -163,7 +163,7 @@ class Test(unittest.TestCase):
         bw = 10  # Bandwidth
         hs = np.arange(0, 80, bw)  # Distance intervals
         # svario = v.semivvar(data, hs, bw)
-        svmodel, svario = v.cvmodel(data, hs, bw, model=v.spherical)
+        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.spherical)
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
 

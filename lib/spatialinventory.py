@@ -63,6 +63,8 @@ class SpatialInventory(Inventory):
         inv_coord    Numpy array containing coordinates of spatial features.
         inv_sv    Empirical semivariogram ndarray.
         inv_svmodel    Fitted Semivariogram function.
+        inv_covmat    Covariance matrix if inventory as ndarray.
+        inv_c0    Sill value of inventory variogram function.
 
         For other parameters see: inventory.Inventory
         """
@@ -72,6 +74,8 @@ class SpatialInventory(Inventory):
         self.inv_coord = None
         self.inv_sv = None
         self.inv_svmodel = None
+        self.inv_covmat = None
+        self.inv_c0 = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     @property
@@ -128,6 +132,22 @@ class SpatialInventory(Inventory):
     def inv_svmodel(self, inv_svmodel):
         self.__inv_svmodel = inv_svmodel
 
+    @property
+    def inv_covmat(self):
+        return self.__inv_covmat
+
+    @inv_covmat.setter
+    def inv_covmat(self, inv_covmat):
+        self.__inv_covmat = inv_covmat
+
+    @property
+    def inv_c0(self):
+        return self.__inv_c0
+
+    @inv_c0.setter
+    def inv_c0(self, inv_c0):
+        self.__inv_c0 = inv_c0
+
     def get_weight_matrix(self, array, rook=False, shpfile=None):
         """Return the spatial weight matrix based on pysal functionalities
 
@@ -182,6 +202,8 @@ class SpatialInventory(Inventory):
         print("[ MAX NEIGHBOR ] = ", w.max_neighbors)
         print("[ ISLANDS ] = ", *w.islands)
         print("[ HISTOGRAM ] = ", *w.histogram)
+
+        self._Inventory__modmtime()
 
         return(w)
 
@@ -329,6 +351,8 @@ class SpatialInventory(Inventory):
             "<%s>" % (self.name)
             raise RuntimeError(msg)
 
+        self._Inventory__modmtime()
+
         return(self.mi)
 
     def get_coord(self):
@@ -370,16 +394,19 @@ class SpatialInventory(Inventory):
             from scipy.spatial.distance import pdist
             distvalues = pdist(coords)
             hmax = max(distvalues)
-            logger.info("Maximum distance of variogram set to <%d>" % (hmax))
+            logger.info("No maximum variogram distance found. Set to <%d>"
+                        % (hmax))
         # Compute standard bandwidth if required.
         if bw is None:
             bw = hmax / 10  # Use tenth distance steps.
+            logger.info("No variogram bandwidth value found. Set to <%d>"
+                        % (bw))
         hs = np.arange(0, hmax, bw)  # Distance intervals
 
         if model and type is None:
-            svmodel, sv = v.cvmodel(data, hs, bw, v.spherical)
+            svmodel, sv, c0 = v.cvmodel(data, hs, bw, v.spherical)
         elif model and type is not None:
-            svmodel, sv = v.cvmodel(data, hs, bw, model=type)
+            svmodel, sv, c0 = v.cvmodel(data, hs, bw, model=type)
         else:
             sv = v.semivvar(data, hs, bw)
 
@@ -388,8 +415,11 @@ class SpatialInventory(Inventory):
         logger.info("Empirical variogram successfully calculated")
         if model:
             self.inv_svmodel = svmodel
+            self.inv_c0 = c0
             logger.info("Theoretical variogram successfully calculated")
-        return(self.inv_sv, self.inv_svmodel)
+        self._Inventory__modmtime()
+
+        return(self.inv_sv, self.inv_svmodel, self.inv_c0)
 
     def plot_variogram(self):
         """Plot variogram for inventory"""
@@ -419,6 +449,11 @@ class SpatialInventory(Inventory):
         This function utilizes a semivariogram model to estimate the
         covariance matrix under the assumption of second order stationarity.
 
+                y(h) = C(0) - C(h)
+
+        with semivariance y(h), variance of zero distances C(0) and covariance
+        C(h) in distance h
+
         Thereby, the matrix is stored as sparse matrix to reduce used memory.
         NaN values are excluded and set to zero
 
@@ -437,23 +472,25 @@ class SpatialInventory(Inventory):
             self.get_variogram(model=True)
 
         # Get size of inventory and create sparse matrix.
+        # TODO: Use sparse matrix for covariance storage
         n = self.inv_array.size
-        covmat = lil_matrix((n, n))
-        covmat.setdiag(np.ones(n))
+        # covmat = lil_matrix((n, n))
+        # covmat.setdiag(np.ones(n))
         # Get distances of inventory values and calculate covariances.
         coords = self.get_coord()
-        print(len(coords))
         dval = pdist(coords)
         dmat = squareform(dval)
-        print(dmat.shape)
-        print(covmat[0, 1])
-        coomat = coo_matrix(covmat)
-        for prod in itertools.product(xrange(n), xrange(n)):
-            #svmat = map(self.inv_svmodel, dmat[0])
-            # print(covmat[prod[0], prod[1]])
         # Estimate semivariances for each pair of inventory elements.
+        svm = np.vectorize(self.inv_svmodel)
+        svmat = svm(dmat)
         # Convert semi variances to covariances under 2nd order stationarity.
+        covmat = self.inv_c0 - svmat
+
+        self.inv_covmat = covmat
         # Store values in sparse covariance matrix
+        self._Inventory__modmtime()
+
+        return(covmat)
 
 
 class RasterInventory(SpatialInventory):
@@ -504,6 +541,8 @@ class RasterInventory(SpatialInventory):
         print("[ UNIT TYPE ] = ", rband.GetUnitType())
         # Get raster band data values as numpy array.
         rdata = rband.ReadAsArray(0, 0, cols, rows).astype(np.float)
+
+        self._Inventory__modmtime()
 
         return(rdata)
 
