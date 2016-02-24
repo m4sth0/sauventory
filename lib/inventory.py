@@ -314,23 +314,37 @@ class Inventory(object):
 
         return(self.inv_sum)
 
-    def propagate(self):
+    def propagate(self, cv=False):
         """ Calculate the overall uncertainty for saved inventory values by
             Gaussian error propagation.
 
-            NaN values are ignored and reatead as zero.
+        NaN values are ignored and treatead as zero.
+
+        Keyword arguments:
+            cv    Boolean if covariances should be used to propagate
+                  uncertainty.
         """
         # Primarily choose existing uncertainty dictionary.
         try:
+            # Select inventory uncertainty source.
             if not self.uncert_dict:
                 uncertobj = self.inv_uncert_array
             else:
                 uncertobj = self.uncert_dict.values()
 
-            result = np.sqrt(np.nansum(map(np.square, uncertobj)))
+            # Optional propagation via covariances.
+            covmat = self.inv_covmat
+            if cv and covmat is None:
+                msg = "Couldn't find covariance matrix of inventory"
+                raise ValueError(msg)
+            elif cv:
+                result = np.sqrt(np.nansum(map(np.square, uncertobj)))
+                + covmat.summarize()
+            else:
+                result = np.sqrt(np.nansum(map(np.square, uncertobj)))
             self.inv_uncert = result
 
-            logger.info('Inventory <%s> uncertainty: %d %s successfully '
+            logger.info('Inventory <%s> uncertainty: <%d> <%s> successfully '
                         'computed' % (self.name, self.inv_uncert, self.unit))
         except:
             logger.info('Inventory <%s> uncertainty not computed'
