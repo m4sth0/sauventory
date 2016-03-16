@@ -63,7 +63,6 @@ class SpatialInventory(Inventory):
         inv_coord    Numpy array containing coordinates of spatial features.
         inv_sv    Empirical semivariogram ndarray.
         inv_svmodel    Fitted Semivariogram function.
-        inv_covmat    Covariance matrix if inventory as ndarray.
         inv_c0    Sill value of inventory variogram function.
 
         For other parameters see: inventory.Inventory
@@ -74,7 +73,6 @@ class SpatialInventory(Inventory):
         self.inv_coord = None
         self.inv_sv = None
         self.inv_svmodel = None
-        self.inv_covmat = None
         self.inv_c0 = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
@@ -131,14 +129,6 @@ class SpatialInventory(Inventory):
     @inv_svmodel.setter
     def inv_svmodel(self, inv_svmodel):
         self.__inv_svmodel = inv_svmodel
-
-    @property
-    def inv_covmat(self):
-        return self.__inv_covmat
-
-    @inv_covmat.setter
-    def inv_covmat(self, inv_covmat):
-        self.__inv_covmat = inv_covmat
 
     @property
     def inv_c0(self):

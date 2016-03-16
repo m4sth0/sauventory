@@ -61,6 +61,7 @@ class Inventory(object):
             mtime      Last modification time stamp.
             inv_array  Numpy array represent inventory values
             inv_index  Numpy array represent inventory indices
+            inv_covmat    Covariance matrix if inventory as ndarray.
         """
         self.name = name
         self.desc = desc
@@ -74,6 +75,7 @@ class Inventory(object):
         self.inv_uncert = None
         self.__inv_sum = None
         self.__inv_uncert = None
+        self.inv_covmat = None
         logger.info('Inventory object: initialized')
 
     @property
@@ -167,6 +169,14 @@ class Inventory(object):
     def inv_uncert(self, inv_uncert):
         self.__inv_uncert = inv_uncert
 
+    @property
+    def inv_covmat(self):
+        return self.__inv_covmat
+
+    @inv_covmat.setter
+    def inv_covmat(self, inv_covmat):
+        self.__inv_covmat = inv_covmat
+
     def __getctime(self):
         return self.__ctime.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -187,8 +197,6 @@ class Inventory(object):
     def printsum(self):
         """Print inventory summary information"""
         start, end = self.timestamp
-        self.accumulate()
-        self.propagate()
         if self.inv_sum:
             acc = round(self.inv_sum, 2)
         else:
@@ -207,7 +215,7 @@ class Inventory(object):
                '\nCreation time: ' + self.ctime + \
                '\nStart: ' + start + \
                ' - End: ' + end + \
-               '\nModification time: ' + self.mtime + \
+               '\nLast modification: ' + self.mtime + \
                '\n--------------------------------------------------------' + \
                '\nInventory accumulation: ' + str(acc) + \
                ' ' + self.unit + \
@@ -325,25 +333,24 @@ class Inventory(object):
                   uncertainty.
         """
         # Primarily choose existing uncertainty dictionary.
+        # Select inventory uncertainty source.
+        if not self.uncert_dict:
+            uncertobj = self.inv_uncert_array
+        else:
+            uncertobj = self.uncert_dict.values()
+
+        # Optional propagation via covariances.
+        if cv and self.inv_covmat is None:
+            msg = ("Couldn't find covariance matrix for inventory <%s>" %
+                   (self.name))
+            raise ValueError(msg)
+        elif cv:
+            result = np.sqrt(self.inv_covmat.sum())
+        else:
+            result = np.sqrt(np.nansum(map(np.square, uncertobj)))
+        self.inv_uncert = result
         try:
-            # Select inventory uncertainty source.
-            if not self.uncert_dict:
-                uncertobj = self.inv_uncert_array
-            else:
-                uncertobj = self.uncert_dict.values()
-
-            # Optional propagation via covariances.
-            covmat = self.inv_covmat
-            if cv and covmat is None:
-                msg = "Couldn't find covariance matrix of inventory"
-                raise ValueError(msg)
-            elif cv:
-                result = np.sqrt(np.nansum(map(np.square, uncertobj)))
-                + covmat.summarize()
-            else:
-                result = np.sqrt(np.nansum(map(np.square, uncertobj)))
-            self.inv_uncert = result
-
+            float(self.inv_uncert)
             logger.info('Inventory <%s> uncertainty: <%d> <%s> successfully '
                         'computed' % (self.name, self.inv_uncert, self.unit))
         except:

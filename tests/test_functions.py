@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
         # Setup test vector file names and location.
         self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
                                "n2o_eu_2010_inventory.shp"
-    """
+
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
         f2 = sf.StepFunction(self.x, self.y, side='right')
@@ -246,7 +246,7 @@ class Test(unittest.TestCase):
         self.assertEqual(round(np.max(sv[1]), 3), 0.245)
         self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
         si.plot_variogram()
-    """
+
     def test_get_cov_matrix_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
@@ -257,7 +257,6 @@ class Test(unittest.TestCase):
 
         si.import_inventory_as_raster(self.invin, self.uncertin)
         si.get_cov_matrix()
-        print(si.inv_covmat[1, 1])
         self.assertEqual(round(np.max(si.inv_covmat), 3), 0.34)
         self.assertEqual(round(np.min(si.inv_covmat), 3), 0.)
         self.assertEqual(round(si.inv_c0, 3), 0.34)
