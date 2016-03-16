@@ -15,8 +15,8 @@ and the uncertainty calculation of a spatial related inventory is affected. Whic
 ---
 
 ## Installation:
-```pip install sauventory
-```
+	pip install sauventory
+
  
 ---
 
@@ -34,10 +34,10 @@ The *sauventory* package primarily consists of two main Python modules. The *inv
 ---
 
 ## Examples:
-```python
-import sauventory as sau
-i = sau.inventory.Inventory(name="Test-inventory", desc="For testing purpose", creator="me")
-```
+
+	import sauventory as sau
+	i = sau.inventory.Inventory(name="Test-inventory", desc="For testing purpose", creator="me")
+
 ---
 
 ## Links:
