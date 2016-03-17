@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+include doc/*.pdf
+include tests/data/*.tiff
+include tests/data/n2o_eu_2010_inventory/*

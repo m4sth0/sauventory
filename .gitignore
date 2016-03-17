@@ -21,6 +21,12 @@
 *.tar
 *.zip
 
+# Editor config files #
+#######################
+*.prefs
+.project
+.pydevproject
+
 # Logs and databases #
 ######################
 *.log

@@ -37,23 +37,25 @@ import os
 import random
 import unittest
 
-import spatialinventory
-import variogram
+from sauventory import spatialinventory
+from sauventory import variogram
 
 
-class Test(unittest.TestCase):
+class VariogramTest(unittest.TestCase):
 
     def setUp(self):
         self.r = np.array([random.randrange(1, 1000) for _ in range(0, 1000)])
 
         # Setup test raster file names and location.
-        cwd = os.getcwd()
-        self.invin = cwd + "/data/model_peat_examp_1.tiff"
-        self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
+        self.invin = os.path.join(os.path.dirname(__file__),
+                                  "data/model_peat_examp_1.tiff")
+        self.uncertin = os.path.join(os.path.dirname(__file__),
+                                     "data/uncert_peat_examp_1.tiff")
 
         # Setup test vector file names and location.
-        self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
-                               "n2o_eu_2010_inventory.shp"
+        self.invvector = os.path.join(os.path.dirname(__file__),
+                                      "data/n2o_eu_2010_inventory/"
+                                      "n2o_eu_2010_inventory.shp")
 
     def test_single_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
@@ -173,5 +175,13 @@ class Test(unittest.TestCase):
     plot( sv[0], sp( sv[0] ) ) ;
     savefig('semivariogram_model.png',fmt='png',dpi=200)
     """
+
+
+def suite():
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(VariogramTest))
+    return suite
+
 if __name__ == "__main__":
-    unittest.main()
+    unittest.TextTestRunner(verbosity=2).run(suite())

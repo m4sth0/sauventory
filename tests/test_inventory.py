@@ -39,11 +39,11 @@ import numpy as np
 import os
 import time
 
-import inventory
-import spatialinventory
+from sauventory import inventory
+from sauventory import spatialinventory
 
 
-class Test(unittest.TestCase):
+class InventoryTest(unittest.TestCase):
 
     def setUp(self):
 
@@ -99,13 +99,15 @@ class Test(unittest.TestCase):
         self.n2ocovsum = np.sqrt(self.n2o_covmat.sum())
         self.n2odiagsum = np.sqrt(np.sum(np.diag(self.n2o_covmat)))
         # Setup test raster file names and location.
-        cwd = os.getcwd()
-        self.invin = cwd + "/data/model_peat_examp_1.tiff"
-        self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
+        self.invin = os.path.join(os.path.dirname(__file__),
+                                  "data/model_peat_examp_1.tiff")
+        self.uncertin = os.path.join(os.path.dirname(__file__),
+                                     "data/uncert_peat_examp_1.tiff")
 
         # Setup test vector file names and location.
-        self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
-                               "n2o_eu_2010_inventory.shp"
+        self.invvector = os.path.join(os.path.dirname(__file__),
+                                      "data/n2o_eu_2010_inventory/"
+                                      "n2o_eu_2010_inventory.shp")
         # Data source: http://ec.europa.eu/eurostat/statistics-explained/
         # index.php/Agri-environmental_indicator_-_greenhouse_gas_emissions
 
@@ -448,5 +450,12 @@ class Test(unittest.TestCase):
                                                        si.inv_uncert_array))),
                                  3))
 
+
+def suite():
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(InventoryTest))
+    return suite
+
 if __name__ == "__main__":
-    unittest.main()
+    unittest.TextTestRunner(verbosity=2).run(suite())

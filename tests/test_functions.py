@@ -35,11 +35,11 @@ import os
 import timeit
 import unittest
 
-import spatialinventory
-import stepfunction as sf
+from sauventory import spatialinventory
+from sauventory import stepfunction as sf
 
 
-class Test(unittest.TestCase):
+class FunctionTest(unittest.TestCase):
 
     def setUp(self):
         # Set basic array
@@ -56,13 +56,15 @@ class Test(unittest.TestCase):
                                   np.empty((1, 10)) * np.nan)).reshape(11, 10)
 
         # Setup test raster file names and location.
-        cwd = os.getcwd()
-        self.invin = cwd + "/data/model_peat_examp_1.tiff"
-        self.uncertin = cwd + "/data/uncert_peat_examp_1.tiff"
+        self.invin = os.path.join(os.path.dirname(__file__),
+                                  "data/model_peat_examp_1.tiff")
+        self.uncertin = os.path.join(os.path.dirname(__file__),
+                                     "data/uncert_peat_examp_1.tiff")
 
         # Setup test vector file names and location.
-        self.invvector = cwd + "/data/n2o_eu_2010_inventory/" \
-                               "n2o_eu_2010_inventory.shp"
+        self.invvector = os.path.join(os.path.dirname(__file__),
+                                      "data/n2o_eu_2010_inventory/"
+                                      "n2o_eu_2010_inventory.shp")
 
     def test_stepfunction(self):
         f = sf.StepFunction(self.x, self.y)
@@ -245,7 +247,7 @@ class Test(unittest.TestCase):
         sv, svm, c0 = si.get_variogram(10, 80, True)
         self.assertEqual(round(np.max(sv[1]), 3), 0.245)
         self.assertEqual(round(np.min(si.inv_sv[1]), 3), 0.168)
-        si.plot_variogram()
+        # si.plot_variogram()
 
     def test_get_cov_matrix_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
@@ -261,5 +263,12 @@ class Test(unittest.TestCase):
         self.assertEqual(round(np.min(si.inv_covmat), 3), 0.)
         self.assertEqual(round(si.inv_c0, 3), 0.34)
 
+
+def suite():
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(FunctionTest))
+    return suite
+
 if __name__ == "__main__":
-    unittest.main()
+    unittest.TextTestRunner(verbosity=2).run(suite())

@@ -37,10 +37,10 @@ https://www.uio.no/studier/emner/matnat/math/STK4400/v05/undervisningsmateriale
 import numpy as np
 import unittest
 
-import ranktransform
+from sauventory import ranktransform
 
 
-class Test(unittest.TestCase):
+class RankTransformTest(unittest.TestCase):
 
     def setUp(self):
 
@@ -94,5 +94,11 @@ class Test(unittest.TestCase):
         self.assertEqual(compare.all(), True)
 
 
+def suite():
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(RankTransformTest))
+    return suite
+
 if __name__ == "__main__":
-    unittest.main()
+    unittest.TextTestRunner(verbosity=2).run(suite())
