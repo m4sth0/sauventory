@@ -36,7 +36,7 @@ import timeit
 import unittest
 
 from sauventory import spatialinventory
-from sauventory import stepfunction as sf
+from sauventory import distfunction as df
 
 
 class FunctionTest(unittest.TestCase):
@@ -67,14 +67,14 @@ class FunctionTest(unittest.TestCase):
                                       "n2o_eu_2010_inventory.shp")
 
     def test_stepfunction(self):
-        f = sf.StepFunction(self.x, self.y)
-        f2 = sf.StepFunction(self.x, self.y, side='right')
+        f = df.StepFunction(self.x, self.y)
+        f2 = df.StepFunction(self.x, self.y, side='right')
 
         self.assertEqual(f(5), 4)
         self.assertEqual(f2(5), 5)
 
     def test_ecdf(self):
-        ecdf = sf.ECDF(self.a)
+        ecdf = df.ECDF(self.a)
         self.assertAlmostEqual(ecdf(1), 0.5, 1)
 
     def test_weight_raster_queen(self):
