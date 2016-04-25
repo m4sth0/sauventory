@@ -56,7 +56,7 @@ class VariogramTest(unittest.TestCase):
         self.invvector = os.path.join(os.path.dirname(__file__),
                                       "data/n2o_eu_2010_inventory/"
                                       "n2o_eu_2010_inventory.shp")
-    """
+
     def test_single_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
@@ -200,7 +200,7 @@ class VariogramTest(unittest.TestCase):
         svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.exponential)
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.323)
-    """
+
     def test_plot_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
