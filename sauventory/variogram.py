@@ -183,7 +183,7 @@ class Variogram(object):
         if model not in models:
             msg = "Model type <%s> not known. Use the following options %s" % \
                   (model, models)
-            raise ValueError(msg)
+            print(msg)
         # Calculate the semivariogram
         sv = self.semivvar(P, hs, bw)
         # Calculate the sill

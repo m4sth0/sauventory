@@ -40,6 +40,7 @@ import logging
 import pysal
 import sys
 import ogr
+import os
 import gdal
 import scipy
 
@@ -411,8 +412,12 @@ class SpatialInventory(Inventory):
 
         return(self.inv_sv, self.inv_svmodel, self.inv_c0)
 
-    def plot_variogram(self):
-        """Plot variogram for inventory"""
+    def plot_variogram(self, file=None):
+        """Plot variogram for inventory
+
+        Keyword arguments:
+            file    File name for figure export
+        """
         import matplotlib.pyplot as plt
         if self.inv_sv is None:
             msg = "No semivariogram found for inventory <%s>. "\
@@ -431,7 +436,11 @@ class SpatialInventory(Inventory):
         axes = list(plt.axis())
         axes[2] = 0
         plt.axis(axes)
-        plt.show()
+        if file is None:
+            plt.show()
+        else:
+            plt.savefig(file, format='png')
+        plt.close()
 
     def get_cov_matrix(self, lim=None):
         """Create covariance matrix of spatial auto correlated inventory
