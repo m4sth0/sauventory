@@ -38,7 +38,7 @@ the Gaussian are supported.
 import logging
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-
+from math import exp
 # Configure logger.
 logger = logging.getLogger('semivariogram')
 
@@ -105,11 +105,16 @@ class Variogram(object):
         return a[mse.argmin()]
 
     def spherical(self, h, a, c0):
-        """Spherical model of the semivariogram"""
+        """ Spherical model of the semivariogram
+
+        Keyowrd arguments:
+            h    lag distance
+            a    (practical) range
+            c0    Sill value"""
         # if h is a single digit
         # TODO: Check performance of float type.
         if type(h) in [np.float64, float]:
-            # calculate the spherical function
+            # Calculate the spherical function
             if h <= a:
                 return c0*(1.5*h/a - 0.5*(h/a)**3.0)
             else:
@@ -120,6 +125,44 @@ class Variogram(object):
             a = np.ones(h.size) * a
             c0 = np.ones(h.size) * c0
             return map(self.spherical, h, a, c0)
+
+    def gaussian(self, h, a, c0):
+        """ Gaussian model of the semivariogram
+
+        Keyowrd arguments:
+            h    lag distance
+            a    (practical) range
+            c0    Sill value"""
+        # if h is a single digit
+        # TODO: Check performance of float type.
+        if type(h) in [np.float64, float]:
+            # Calculate the gaussian function
+            return c0*(1. - exp((-3.*h**2.)/a**2.))
+        # if h is an iterable
+        else:
+            # Calcualte the gaussian function for all elements
+            a = np.ones(h.size) * a
+            c0 = np.ones(h.size) * c0
+            return map(self.gaussian, h, a, c0)
+
+    def exponential(self, h, a, c0):
+        """ Exponential model of the semivariogram
+
+        Keyowrd arguments:
+            h    lag distance
+            a    (practical) range
+            c0    Sill value"""
+        # if h is a single digit
+        # TODO: Check performance of float type.
+        if type(h) in [np.float64, float]:
+            # Calculate the exponential function
+            return c0*(1. - exp((-3.*h)/a))
+        # if h is an iterable
+        else:
+            # Calcualte the exponential function for all elements
+            a = np.ones(h.size) * a
+            c0 = np.ones(h.size) * c0
+            return map(self.exponential, h, a, c0)
 
     def cvmodel(self, P, hs, bw, model):
         """ Model semivariances with specific functions.
@@ -136,7 +179,7 @@ class Variogram(object):
             sv    semivariogram
             c0    sill value
         """
-        models = [self.spherical]
+        models = [self.spherical, self.gaussian, self.exponential]
         if model not in models:
             msg = "Model type <%s> not known. Use the following options %s" % \
                   (model, models)

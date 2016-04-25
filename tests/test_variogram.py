@@ -169,6 +169,48 @@ class VariogramTest(unittest.TestCase):
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
 
+    def test_gaussian_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        # svario = v.semivvar(data, hs, bw)
+        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.gaussian)
+        self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
+        self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
+
+    def test_exponential_variogram_raster(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        # svario = v.semivvar(data, hs, bw)
+        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.exponential)
+        self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
+        self.assertEqual(round(svmodel(svario[0][7]), 3), 0.323)
+
     """
     sp = cvmodel( P, model=spherical, hs=np.arange(0,10500,500), bw=500 )
     plot( sv[0], sv[1], '.-' )
