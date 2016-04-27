@@ -53,7 +53,7 @@ class Variogram(object):
     def __init__(self):
         pass
 
-    def semivvarh(self, P, h, bw):
+    def semivarh(self, P, h, bw):
         """Experimental semivariogram for a single lag.
 
         Keyword arguments:
@@ -71,20 +71,48 @@ class Variogram(object):
         Z = list()
         for i in range(N):
             for j in range(i+1, N):
-                if(pd[i, j] >= h - bw) and (pd[i, j] <= h + bw):
+                if(pd[i, j] >= h) and (pd[i, j] < h + bw):
                     Z.append((P[i, 2] - P[j, 2])**2.0)
         # Calculate semivariance.
         nnan = len(np.invert(np.isnan(Z)))
         sv = np.nansum(Z) / (2.0 * nnan)
+
         return(sv)
 
-    def semivvar(self, P, hs, bw):
+    def covarh(self, P, h, bw):
+        """Experimental covariance for a single lag.
+
+        Keyword arguments:
+            P    Input data array n x (x , y, v) with n number of rows with two
+                 dimensional coordinates (x, y) and corresponding value (v) for
+                 local observation.
+            h    Lag distance
+            bw    Bandwise
+
+        Returns:
+            Semivariance
+        """
+        pd = squareform(pdist(P[:, :2]))
+        N = pd.shape[0]
+        T = list()  # Tail values f(i)
+        H = list()  # Head values f(i+h)
+        for i in range(N):
+            for j in range(i+1, N):
+                if(pd[i, j] >= h) and (pd[i, j] < h + bw):
+                    T.append(P[i, 2])
+                    H.append(P[j, 2])
+        # Calculate covariance.
+        cov = np.cov(np.array([T, H]))
+
+        return(cov)
+
+    def semivar(self, P, hs, bw):
         """
         Experimental variogram for a collection of lags
         """
         sv = list()
         for h in hs:
-            sv.append(self.semivvarh(P, h, bw))
+            sv.append(self.semivarh(P, h, bw))
         sv = [[hs[i], sv[i]] for i in range(len(hs)) if sv[i] > 0]
         return np.array(sv).T
 
@@ -103,6 +131,18 @@ class Variogram(object):
         for i in range(meshSize):
             mse[i] = np.mean((y - fct(x, a[i], c0))**2.0)
         return a[mse.argmin()]
+
+    def nugget(self, h, c):
+        """ Simple nugget model for the semivariogram
+
+        Keyword arguments:
+            h    lag distance
+            c    Sill value
+        """
+        if h == 0:
+            return 0
+        else:
+            return c
 
     def spherical(self, h, a, c0):
         """ Spherical model of the semivariogram
@@ -185,7 +225,7 @@ class Variogram(object):
                   (model, models)
             print(msg)
         # Calculate the semivariogram
-        sv = self.semivvar(P, hs, bw)
+        sv = self.semivar(P, hs, bw)
         # Calculate the sill
         c0 = self.c(P, hs[0], bw)
         # Calculate the optimal parameters

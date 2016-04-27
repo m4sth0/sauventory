@@ -399,7 +399,7 @@ class SpatialInventory(Inventory):
         elif model and type is not None:
             svmodel, sv, c0 = v.cvmodel(data, hs, bw, model=type)
         else:
-            sv = v.semivvar(data, hs, bw)
+            sv = v.semivar(data, hs, bw)
 
         # Assign semivariogram as class objects
         self.inv_sv = sv

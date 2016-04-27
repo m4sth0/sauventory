@@ -56,6 +56,30 @@ class VariogramTest(unittest.TestCase):
         self.invvector = os.path.join(os.path.dirname(__file__),
                                       "data/n2o_eu_2010_inventory/"
                                       "n2o_eu_2010_inventory.shp")
+        # Import soil test dataset
+        # Calcium and magnesium contents in soil samples at the 0-20cm and
+        # 20-40 soil layers. Source: Capeche, C. L. et. al. (1997).
+        # Used also in Diggle & Ribeiro Jr (2007) Model Based Geostatistics
+        soilfile = open('./data/soildata.txt', 'r')
+        sdata = soilfile.readlines()
+
+        self.sdata = np.array([map(float, l.split()) for l in sdata[1:]])
+
+    def test_nugget_variogram(self):
+        v = variogram.Variogram()
+        data = self.sdata[:, :3]
+        # print(data)
+        # Define variogram parameters
+        bw = 40  # Bandwidth
+        hs = np.arange(0, 1000, bw)  # Distance intervals
+        # print(hs)
+        # sv1 = v.semivvarh(data, 500, 50)
+        # svario = v.semivvar(data, hs, bw)
+        # print(svario)
+        cov = v.covarh(data, 180, 40)
+        semiv = v.semivarh(data, 180, 40)
+        print(cov)
+        print(semiv)
 
     def test_single_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
