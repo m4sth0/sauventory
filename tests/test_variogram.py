@@ -65,21 +65,25 @@ class VariogramTest(unittest.TestCase):
 
         self.sdata = np.array([map(float, l.split()) for l in sdata[1:]])
 
-    def test_nugget_variogram(self):
+    def test_soil_variogram(self):
         v = variogram.Variogram()
+        si = spatialinventory.SpatialInventory("Soil data", "g/m2",
+                                               "Example soil data",
+                                               ("1990-01-01 00:00:00",
+                                                "1990-01-01 00:00:00"))
         data = self.sdata[:, :3]
+        si.inv_coord = data[:, :2]
+        si.inv_array = data[:, 2]
         # print(data)
         # Define variogram parameters
-        bw = 40  # Bandwidth
-        hs = np.arange(0, 1000, bw)  # Distance intervals
-        # print(hs)
-        # sv1 = v.semivvarh(data, 500, 50)
-        # svario = v.semivvar(data, hs, bw)
-        # print(svario)
-        cov = v.covarh(data, 180, 40)
-        semiv = v.semivarh(data, 180, 40)
-        print(cov)
-        print(semiv)
+        bw = 100  # Bandwidth
+        hmax = 1200  # Maximum distance
+        hs = np.arange(0, 600, bw)  # Distance intervals
+        sv, svmodel, c, c0 = si.get_variogram(bw, hmax, model=True,
+                                              type=v.nugget)
+        cov = si.get_covariance(bw, hmax)
+        si.plot_variogram(file="/tmp/sauventory_test_soil_vario.png",
+                          caxis=True, naxis=True)
 
     def test_single_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
@@ -162,6 +166,27 @@ class VariogramTest(unittest.TestCase):
         self.assertEqual(round(np.max(svario[1]), 3), 142924111.258)
         self.assertEqual(round(np.min(svario[1]), 3), 16520.533)
 
+    def test_nugget_variogram(self):
+        si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
+                                              "Example N2O inventory of "
+                                              "organic soils",
+                                              ("2012-01-01 00:00:00",
+                                               "2013-01-01 00:00:00"),
+                                              creator="Tester")
+
+        si.import_inventory_as_raster(self.invin, self.uncertin)
+        v = variogram.Variogram()
+        coords = si.get_coord()
+        data = np.hstack((coords, si.inv_array.reshape((si.inv_array.size,
+                                                        1))))
+        # Define variogram parameters
+        bw = 10  # Bandwidth
+        hs = np.arange(0, 80, bw)  # Distance intervals
+        # svario = v.semivvar(data, hs, bw)
+        svmodel, svario, c, c0 = v.cvmodel(data, hs, bw, model=v.nugget)
+        self.assertEqual(round(svmodel(svario[0][0]), 3), 0.167)
+        self.assertEqual(round(svmodel(svario[0][1]), 3), 0.340)
+
     def test_spherical_variogram_raster(self):
         si = spatialinventory.RasterInventory("N2O-Agrar-2012", "g/m2",
                                               "Example N2O inventory of "
@@ -179,7 +204,7 @@ class VariogramTest(unittest.TestCase):
         bw = 10  # Bandwidth
         hs = np.arange(0, 80, bw)  # Distance intervals
         # svario = v.semivvar(data, hs, bw)
-        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.spherical)
+        svmodel, svario, c, c0 = v.cvmodel(data, hs, bw, model=v.spherical)
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
 
@@ -200,7 +225,7 @@ class VariogramTest(unittest.TestCase):
         bw = 10  # Bandwidth
         hs = np.arange(0, 80, bw)  # Distance intervals
         # svario = v.semivvar(data, hs, bw)
-        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.gaussian)
+        svmodel, svario, c, c0 = v.cvmodel(data, hs, bw, model=v.gaussian)
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.340)
 
@@ -221,7 +246,7 @@ class VariogramTest(unittest.TestCase):
         bw = 10  # Bandwidth
         hs = np.arange(0, 80, bw)  # Distance intervals
         # svario = v.semivvar(data, hs, bw)
-        svmodel, svario, c0 = v.cvmodel(data, hs, bw, model=v.exponential)
+        svmodel, svario, c, c0 = v.cvmodel(data, hs, bw, model=v.exponential)
         self.assertEqual(round(svmodel(svario[0][0]), 3), 0.)
         self.assertEqual(round(svmodel(svario[0][7]), 3), 0.323)
 
@@ -234,11 +259,11 @@ class VariogramTest(unittest.TestCase):
                                               creator="Tester")
         v = variogram.Variogram()
         si.import_inventory_as_raster(self.invin, self.uncertin)
-        sv, svm, c0 = si.get_variogram(10, 80, True)
+        sv, svm, c, c0 = si.get_variogram(10, 80, True)
         si.plot_variogram("/tmp/sauventory_test_spherical_vario.png")
-        sv, svm, c0 = si.get_variogram(10, 80, True, type=v.gaussian)
+        sv, svm, c, c0 = si.get_variogram(10, 80, True, type=v.gaussian)
         si.plot_variogram("/tmp/sauventory_test_gaussian_vario.png")
-        sv, svm, c0 = si.get_variogram(10, 80, True, type=v.exponential)
+        sv, svm, c, c0 = si.get_variogram(10, 80, True, type=v.exponential)
         si.plot_variogram("/tmp/sauventory_test_exponential_vario.png")
 
         self.assertEqual(round(np.max(sv[1]), 3), 0.245)

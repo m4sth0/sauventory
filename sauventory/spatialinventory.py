@@ -64,7 +64,9 @@ class SpatialInventory(Inventory):
         inv_coord    Numpy array containing coordinates of spatial features.
         inv_sv    Empirical semivariogram ndarray.
         inv_svmodel    Fitted Semivariogram function.
-        inv_c0    Sill value of inventory variogram function.
+        inv_c    Sill value of inventory variogram function.
+        inv_c0    Nugget value of inventory variogram function.
+        inv_cov    Sampel covariance ndarray for lag distances.
 
         For other parameters see: inventory.Inventory
         """
@@ -74,7 +76,9 @@ class SpatialInventory(Inventory):
         self.inv_coord = None
         self.inv_sv = None
         self.inv_svmodel = None
+        self.inv_c = None
         self.inv_c0 = None
+        self.inv_cov = None
         super(SpatialInventory, self).__init__(*args, **kwargs)
 
     @property
@@ -132,12 +136,28 @@ class SpatialInventory(Inventory):
         self.__inv_svmodel = inv_svmodel
 
     @property
+    def inv_c(self):
+        return self.__inv_c
+
+    @inv_c.setter
+    def inv_c(self, inv_c):
+        self.__inv_c = inv_c
+
+    @property
     def inv_c0(self):
         return self.__inv_c0
 
     @inv_c0.setter
     def inv_c0(self, inv_c0):
         self.__inv_c0 = inv_c0
+
+    @property
+    def inv_cov(self):
+        return self.__inv_cov
+
+    @inv_cov.setter
+    def inv_cov(self, inv_cov):
+        self.__inv_cov = inv_cov
 
     def get_weight_matrix(self, array, rook=False, shpfile=None):
         """Return the spatial weight matrix based on pysal functionalities
@@ -359,6 +379,8 @@ class SpatialInventory(Inventory):
                 result = self.inv_coord
             elif self.sptype == 'vector':
                 result = self.inv_coord
+            elif self.sptype is None:
+                result = self.inv_coord
         except:
             msg = "Couldn't get coordinates for inventory "
             "<%s>" % (self.name)
@@ -385,19 +407,19 @@ class SpatialInventory(Inventory):
             from scipy.spatial.distance import pdist
             distvalues = pdist(coords)
             hmax = max(distvalues)
-            logger.info("No maximum variogram distance found. Set to <%d>"
+            logger.info("No maximum variogram lag distance found. Set to <%d>"
                         % (hmax))
         # Compute standard bandwidth if required.
         if bw is None:
             bw = hmax / 10  # Use tenth distance steps.
-            logger.info("No variogram bandwidth value found. Set to <%d>"
+            logger.info("No variogram lag bandwidth value found. Set to <%d>"
                         % (bw))
         hs = np.arange(0, hmax, bw)  # Distance intervals
 
         if model and type is None:
-            svmodel, sv, c0 = v.cvmodel(data, hs, bw, v.spherical)
+            svmodel, sv, c, c0 = v.cvmodel(data, hs, bw, v.spherical)
         elif model and type is not None:
-            svmodel, sv, c0 = v.cvmodel(data, hs, bw, model=type)
+            svmodel, sv, c, c0 = v.cvmodel(data, hs, bw, model=type)
         else:
             sv = v.semivar(data, hs, bw)
 
@@ -406,17 +428,56 @@ class SpatialInventory(Inventory):
         logger.info("Empirical variogram successfully calculated")
         if model:
             self.inv_svmodel = svmodel
+            self.inv_c = c
             self.inv_c0 = c0
             logger.info("Theoretical variogram successfully calculated")
         self._Inventory__modmtime()
 
-        return(self.inv_sv, self.inv_svmodel, self.inv_c0)
+        return(self.inv_sv, self.inv_svmodel, self.inv_c, self.inv_c0)
 
-    def plot_variogram(self, file=None):
+    def get_covariance(self, bw=None, hmax=None):
+        """Get covariance values for spatial inventory values
+
+        Keyword arguments:
+            bw    Bandwidth of distances. Defualt is tenth of maximum distance
+            hmax    Maximum distance. Default is maximum distance found.
+        """
+        v = variogram.Variogram()
+        coords = self.get_coord()
+        data = np.hstack((coords, self.inv_array.reshape((self.inv_array.size,
+                                                          1))))
+        # Compute maximum distance of coordinates per default.
+        if hmax is None:
+            from scipy.spatial.distance import pdist
+            distvalues = pdist(coords)
+            hmax = max(distvalues)
+            logger.info("No maximum covariance lag distance found. Set to <%d>"
+                        % (hmax))
+        # Compute standard bandwidth if required.
+        if bw is None:
+            bw = hmax / 10  # Use tenth distance steps.
+            logger.info("No covariance lag bandwidth value found. Set to <%d>"
+                        % (bw))
+        hs = np.arange(0, hmax, bw)  # Distance intervals
+        # Calculate covariances
+        cov = v.covar(data, hs, bw)
+
+        # Assign semivariogram as class objects
+        self.inv_cov = cov
+        logger.info("Sample covariances successfully calculated")
+        self._Inventory__modmtime()
+
+        return(self.inv_cov)
+
+    def plot_variogram(self, file=None, naxis=False, caxis=False):
         """Plot variogram for inventory
 
         Keyword arguments:
             file    File name for figure export
+            naxis    Boolean if second y-axis with number of elements per lag
+                     should be drawn
+            caxis    Boolean second y-axis with covariances for given lags
+                     should be drawn
         """
         import matplotlib.pyplot as plt
         if self.inv_sv is None:
@@ -425,17 +486,37 @@ class SpatialInventory(Inventory):
             raise ValueError(msg)
         sv = self.inv_sv
         svmodel = self.inv_svmodel
-        plt.plot(sv[0], sv[1], '.-')
-        if svmodel is not None:
-            plt.plot(sv[0], svmodel(sv[0]))
+        cov = self.inv_cov
+        # Setup plot environment
+        fig, ax1 = plt.subplots()
         plt.title('Semivariogram for inventory <%s>' % (self.name))
-        plt.xlabel('Lag [m]')
-        plt.ylabel('Semivariance')
-        plt.title('Spherical semivariogram model for inventory <%s>' %
-                  (self.name))
-        axes = list(plt.axis())
-        axes[2] = 0
-        plt.axis(axes)
+        ax1.plot(sv[0], sv[1], 'o', color='black')
+        ax1.set_xlabel('Lag')
+        ax1.set_ylabel('Semivariance')
+        ax1.axhline(y=0, ls='-', color='black')
+        # Calculate bar width based on sample bandwidth
+        bw = 0.5 * np.max(sv[0]) / len(sv[0])
+
+        if caxis:
+            ax1.plot(cov[0], cov[1], color="black", ls=':', label="Covariance")
+
+        # Optional variogram model plot
+        if svmodel is not None:
+            ax1.plot(sv[0], svmodel(sv[0]), color='black',
+                     label='Variogram model')
+            ax1.text(min(sv[0]), max(sv[1]),
+                     "Sill: %.3f\nNugget: %.3f" % (self.inv_c,
+                                                   self.inv_c0))
+            ax1.axhline(y=self.inv_c, ls='--', color='black')
+        plt.xlim(0 - bw, max(sv[0]) + bw)
+        plt.legend(loc=1)
+        # Optional second axis with number of elements per lag
+        if naxis:
+            ax2 = ax1.twinx()
+            ax2.bar(sv[0], sv[2], align='center', width=bw,
+                    color="gray", alpha=0.3, label='N')
+            ax2.set_ylabel('Number of values')
+
         if file is None:
             plt.show()
         else:
@@ -483,7 +564,7 @@ class SpatialInventory(Inventory):
         svm = np.vectorize(self.inv_svmodel)
         svmat = svm(dmat)
         # Convert semi variances to covariances under 2nd order stationarity.
-        covmat = self.inv_c0 - svmat
+        covmat = self.inv_c - svmat
 
         self.inv_covmat = covmat
         # Store values in sparse covariance matrix

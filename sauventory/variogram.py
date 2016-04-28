@@ -77,7 +77,7 @@ class Variogram(object):
         nnan = len(np.invert(np.isnan(Z)))
         sv = np.nansum(Z) / (2.0 * nnan)
 
-        return(sv)
+        return(sv, nnan)
 
     def covarh(self, P, h, bw):
         """Experimental covariance for a single lag.
@@ -102,107 +102,159 @@ class Variogram(object):
                     T.append(P[i, 2])
                     H.append(P[j, 2])
         # Calculate covariance.
-        cov = np.cov(np.array([T, H]))
+        nnan = len(np.invert(np.isnan(T)))
+        # Get covariance matrix
+        covmat = np.cov(np.array([T, H]))
+        # Extract covariance
+        cov = covmat[0, -1]
 
-        return(cov)
+        return(cov, nnan)
 
     def semivar(self, P, hs, bw):
         """
         Experimental variogram for a collection of lags
         """
         sv = list()
+        n = list()
         for h in hs:
-            sv.append(self.semivarh(P, h, bw))
-        sv = [[hs[i], sv[i]] for i in range(len(hs)) if sv[i] > 0]
+            svh, nh = self.semivarh(P, h, bw)
+            sv.append(svh)
+            n.append(nh)
+        sv = [[hs[i], sv[i], n[i]] for i in range(len(hs)) if sv[i] > 0]
         return np.array(sv).T
+
+    def covar(self, P, hs, bw):
+        """
+        Experimental covariance function for a collection of lags
+        """
+        cov = list()
+        n = list()
+        for h in hs:
+            covh, nh = self.covarh(P, h, bw)
+            cov.append(covh)
+            n.append(nh)
+        cov = [[hs[i], cov[i], n[i]] for i in range(len(hs))]
+
+        return np.array(cov).T
 
     def c(self, P, h, bw):
         """Calculate the sill"""
-        c0 = np.nanvar(P[:, 2])
+        c = np.nanvar(P[:, 2])
         if h == 0:
-            return c0
-        return c0 - self.semivvarh(P, h, bw)
+            return c
+        else:
+            return c - self.semivarh(P, h, bw)
 
-    def opt(self, fct, x, y, c0, parameterRange=None, meshSize=1000):
+    def c0(self, P, bw):
+        """Calculate the nugget"""
+        c0, n = self.semivarh(P, 0, bw)
+
+        return c0
+
+    def opt(self, fct, x, y, c, c0, parameterRange=None, meshSize=1000):
         if parameterRange is None:
             parameterRange = [x[1], x[-1]]
         mse = np.zeros(meshSize)
         a = np.linspace(parameterRange[0], parameterRange[1], meshSize)
         for i in range(meshSize):
-            mse[i] = np.mean((y - fct(x, a[i], c0))**2.0)
+            mse[i] = np.mean((y - fct(x, a[i], c, c0))**2.0)
         return a[mse.argmin()]
 
-    def nugget(self, h, c):
+    def nugget(self, h, *args):
         """ Simple nugget model for the semivariogram
 
         Keyword arguments:
             h    lag distance
             c    Sill value
+            c0    Nugget value
         """
-        if h == 0:
-            return 0
+        if len(args) != 2:
+            c = args[1]
+            c0 = args[2]
         else:
-            return c
+            c = args[0]
+            c0 = args[1]
+        # if h is a single digit
+        if type(h) in [np.float64, float]:
+            if h == 0:
+                return c0
+            else:
+                return c
+        # if h is an iterable
+        else:
+            # Calcualte the spherical function for all elements
+            c = np.ones(h.size) * c
+            c0 = np.ones(h.size) * c0
+            return map(self.nugget, h, c, c0)
 
-    def spherical(self, h, a, c0):
+    def spherical(self, h, *args):
         """ Spherical model of the semivariogram
 
-        Keyowrd arguments:
+        Keyword arguments:
             h    lag distance
             a    (practical) range
-            c0    Sill value"""
+            c    Sill value
+            """
         # if h is a single digit
+        a = args[0]
+        c = args[1]
         # TODO: Check performance of float type.
         if type(h) in [np.float64, float]:
             # Calculate the spherical function
             if h <= a:
-                return c0*(1.5*h/a - 0.5*(h/a)**3.0)
+                return c*(1.5*h/a - 0.5*(h/a)**3.0)
             else:
-                return c0
+                return c
         # if h is an iterable
         else:
             # Calcualte the spherical function for all elements
             a = np.ones(h.size) * a
-            c0 = np.ones(h.size) * c0
-            return map(self.spherical, h, a, c0)
+            c = np.ones(h.size) * c
+            return map(self.spherical, h, a, c)
 
-    def gaussian(self, h, a, c0):
+    def gaussian(self, h, *args):
         """ Gaussian model of the semivariogram
 
-        Keyowrd arguments:
+        Keyword arguments:
             h    lag distance
             a    (practical) range
-            c0    Sill value"""
+            c    Sill value
+            """
         # if h is a single digit
+        a = args[0]
+        c = args[1]
         # TODO: Check performance of float type.
         if type(h) in [np.float64, float]:
             # Calculate the gaussian function
-            return c0*(1. - exp((-3.*h**2.)/a**2.))
+            return c*(1. - exp((-3.*h**2.)/a**2.))
         # if h is an iterable
         else:
             # Calcualte the gaussian function for all elements
             a = np.ones(h.size) * a
-            c0 = np.ones(h.size) * c0
-            return map(self.gaussian, h, a, c0)
+            c = np.ones(h.size) * c
+            return map(self.gaussian, h, a, c)
 
-    def exponential(self, h, a, c0):
+    def exponential(self, h, *args):
         """ Exponential model of the semivariogram
 
-        Keyowrd arguments:
+        Keyword arguments:
             h    lag distance
             a    (practical) range
-            c0    Sill value"""
+            c    Sill value
+            """
         # if h is a single digit
+        a = args[0]
+        c = args[1]
         # TODO: Check performance of float type.
         if type(h) in [np.float64, float]:
             # Calculate the exponential function
-            return c0*(1. - exp((-3.*h)/a))
+            return c*(1. - exp((-3.*h)/a))
         # if h is an iterable
         else:
             # Calcualte the exponential function for all elements
             a = np.ones(h.size) * a
-            c0 = np.ones(h.size) * c0
-            return map(self.exponential, h, a, c0)
+            c = np.ones(h.size) * c
+            return map(self.exponential, h, a, c)
 
     def cvmodel(self, P, hs, bw, model):
         """ Model semivariances with specific functions.
@@ -219,18 +271,19 @@ class Variogram(object):
             sv    semivariogram
             c0    sill value
         """
-        models = [self.spherical, self.gaussian, self.exponential]
-        if model not in models:
-            msg = "Model type <%s> not known. Use the following options %s" % \
-                  (model, models)
-            print(msg)
+        if not callable(model):
+            msg = "ERROR: Variogram model type is not callable"
+            raise RuntimeError(msg)
         # Calculate the semivariogram
         sv = self.semivar(P, hs, bw)
         # Calculate the sill
-        c0 = self.c(P, hs[0], bw)
+        c = self.c(P, hs[0], bw)
+        # Calculate the nugget
+        c0 = self.c0(P, bw)
         # Calculate the optimal parameters
-        param = self.opt(model, sv[0], sv[1], c0)
+        param = self.opt(model, sv[0], sv[1], c, c0)
+        args = (param, c, c0)
         # Return a covariance function
-        covfct = lambda h, a=param: model(h, a, c0)
+        covfct = lambda h: model(h, *args)
 
-        return covfct, sv, c0
+        return covfct, sv, c, c0
